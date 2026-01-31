@@ -10,6 +10,10 @@ const supabase = createClient(
 
 // GET list all vehicles
 export async function GET() {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
   const { data, error } = await supabase
     .from("vehicles")
     .select("id, plate_number, type, max_pallet, status")

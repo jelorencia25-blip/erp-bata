@@ -3,12 +3,13 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
+
+
+export async function GET() {
+  const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-export async function GET() {
   const { data, error } = await supabase
     .from("customers")
     .select("id, name, nametambahan, phone, address, credit_limit, status")
@@ -22,6 +23,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
   const body = await req.json();
   const {
     name,
@@ -54,6 +59,10 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
 

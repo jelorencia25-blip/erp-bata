@@ -3,13 +3,14 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+
+/* ================= GET (LOAD PAGE) ================= */
+export async function GET() {
+  
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-/* ================= GET (LOAD PAGE) ================= */
-export async function GET() {
   try {
     const { data: deliveries, error: deliveryError } = await supabase
       .from("delivery_orders")
@@ -77,6 +78,11 @@ export async function GET() {
 
 /* ================= POST (SAVE ROW) ================= */
 export async function POST(req: Request) {
+  
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
   try {
     const body = await req.json();
 

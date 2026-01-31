@@ -3,15 +3,17 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+
 
 /* ======================
    GET STAFF
 ====================== */
 export async function GET() {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
   const { data, error } = await supabase
     .from("staff")
     .select("id, name, posisi, level, phone, email, address, salary, status")
@@ -29,6 +31,11 @@ export async function GET() {
    ADD STAFF
 ====================== */
 export async function POST(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
   try {
     const body = await req.json();
     const { name, posisi, level, phone, email, address, salary, status } = body;
@@ -64,6 +71,11 @@ export async function POST(req: Request) {
    UPDATE STAFF
 ====================== */
 export async function PATCH(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
   try {
     const body = await req.json();
     const { id, ...data } = body;
@@ -95,6 +107,11 @@ export async function PATCH(req: Request) {
    DELETE STAFF
 ====================== */
 export async function DELETE(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
   try {
     const body = await req.json();
     const { id } = body;

@@ -5,22 +5,25 @@ export const dynamic = 'force-dynamic'
 import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+
 
 // ============ EXISTING GET METHOD ============
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+
   const { id } = await params;
 
   if (!id) {
     return NextResponse.json({ error: "ID tidak boleh kosong" }, { status: 400 });
   }
 
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+  
   try {
     const { data: delivery, error: deliveryError } = await supabase
       .from("delivery_orders")
@@ -164,6 +167,12 @@ export async function PUT(
   if (!id) {
     return NextResponse.json({ error: "ID tidak boleh kosong" }, { status: 400 });
   }
+
+    const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
 
   try {
     const body = await req.json();

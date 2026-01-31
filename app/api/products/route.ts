@@ -4,15 +4,18 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+
 
 /* ======================
    GET PRODUCTS
 ====================== */
 export async function GET() {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // 🔥 INI KUNCI
+);
+
+
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -33,6 +36,11 @@ export async function GET() {
    ADD PRODUCT
 ====================== */
 export async function POST(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // 🔥 INI KUNCI
+);
+
   const body = await req.json();
 
   const {
@@ -75,6 +83,11 @@ export async function POST(req: Request) {
    UPDATE PRODUCT
 ====================== */
 export async function PUT(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // 🔥 INI KUNCI
+);
+
   const body = await req.json();
   const { id, ...data } = body;
 
@@ -105,6 +118,11 @@ export async function PUT(req: Request) {
    DELETE PRODUCT
 ====================== */
 export async function DELETE(req: Request) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // 🔥 INI KUNCI
+);
+
   const body = await req.json();
   const { id } = body;
 
