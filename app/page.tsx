@@ -1,8 +1,14 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
 export default function Home() {
-  return (
-    <>
-      <meta httpEquiv="refresh" content="0;url=/login" />
-      <script>window.location.href = '/login';</script>
-    </>
-  );
+  const router = useRouter()
+  
+  useEffect(() => {
+    router.push('/login')
+  }, [router])
+  
+  return <div>Redirecting...</div>
 }
