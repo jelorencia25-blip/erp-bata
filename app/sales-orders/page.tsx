@@ -9,12 +9,14 @@ export default function HomePage() {
   useEffect(() => {
     const user = localStorage.getItem('user');
 
-    if (user) {
-      router.replace('/dashboard');
-    } else {
+    if (!user) {
       router.replace('/login');
+      return;
     }
-  }, [router]);
+
+    // default page setelah login
+    router.replace('/dashboard');
+  }, []);
 
   return null;
 }
