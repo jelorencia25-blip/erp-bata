@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,10 +13,6 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     console.log("ITEMS FROM FRONTEND:", JSON.stringify(body.items, null, 2));
-
-    console.log("FULL BODY:", JSON.stringify(body, null, 2));
-console.log("customer_id:", body.customer_id);
-console.log("items:", body.items);
 
 
  if (!body.customer_id) {

@@ -1,3 +1,9 @@
+export const dynamic = 'force-dynamic'
+
+
+// ... rest of your existing code stays the same
+
+
 import './globals.css';
 
 export default function RootLayout({
