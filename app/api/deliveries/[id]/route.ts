@@ -3,9 +3,9 @@ import { supabase } from "@/lib/lib/supabase";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   const { data: delivery, error } = await supabase
     .from("delivery_orders")
@@ -63,9 +63,9 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
   const { vehicle_id, driver_id, status, returns } = body;
 
@@ -97,18 +97,18 @@ export async function PUT(
         .select("sales_order_id")
         .eq("id", id)
         .single();
-if (!delivery) {
-  return NextResponse.json(
-    { error: "Delivery tidak ditemukan" },
-    { status: 404 }
-  );
-}
 
-const { data: soItems } = await supabase
-  .from("sales_order_items")
-  .select("*")
-  .eq("sales_order_id", delivery.sales_order_id);
+      if (!delivery) {
+        return NextResponse.json(
+          { error: "Delivery tidak ditemukan" },
+          { status: 404 }
+        );
+      }
 
+      const { data: soItems } = await supabase
+        .from("sales_order_items")
+        .select("*")
+        .eq("sales_order_id", delivery.sales_order_id);
 
       // Insert new returns
       const returnPayload = Object.entries(returns)
