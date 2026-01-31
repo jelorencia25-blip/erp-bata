@@ -1,6 +1,8 @@
-import { redirect } from "next/navigation";
-
 export default function Home() {
-  redirect("/login");
-  return null; // This line won't be reached, but TypeScript needs it
+  return (
+    <>
+      <meta httpEquiv="refresh" content="0;url=/login" />
+      <script>window.location.href = '/login';</script>
+    </>
+  );
 }
