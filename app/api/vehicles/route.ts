@@ -3,10 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+
 
 // GET list all vehicles
 export async function GET() {
@@ -26,6 +23,10 @@ export async function GET() {
 
 // POST add new vehicle
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
   const body = await req.json();
   const { plate_number, type, max_pallet, status } = body;
 
