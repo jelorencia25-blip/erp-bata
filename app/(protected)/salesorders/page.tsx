@@ -15,7 +15,7 @@ type SalesOrder = {
   total_pcs: number | null;
   uk: string | null;
   total_price: number | null;
-  purchase_type: string | null; // 🔥 TAMBAH INI
+  purchase_type: string | null;
   status: string | null;
 };
 
@@ -30,7 +30,6 @@ function StatusBadge({ status }: { status: string | null }) {
     cancelled: 'bg-red-100 text-red-800',
   };
 
-
   return (
     <span
       className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -42,8 +41,7 @@ function StatusBadge({ status }: { status: string | null }) {
   );
 }
 
-
-  function PurchaseBadge({ type }: { type: string | null }) {
+function PurchaseBadge({ type }: { type: string | null }) {
   if (!type) return <span className="text-gray-400">-</span>;
 
   const isFranco = type === 'Franco';
@@ -76,10 +74,10 @@ export default function SalesOrdersPage() {
   useEffect(() => {
     const fetchOrders = async () => {
       const { data, error } = await supabase
-  .from('v_sales_orders_list')
-  .select('*')
-  .order('order_date', { ascending: false })
-  .order('so_number', { ascending: false });
+        .from('v_sales_orders_list')
+        .select('*')
+        .order('order_date', { ascending: false })
+        .order('so_number', { ascending: false });
 
       if (error) {
         console.error(error);
@@ -139,6 +137,24 @@ export default function SalesOrdersPage() {
     );
   };
 
+  // 🔥 CALCULATE OVERVIEW STATS
+  const totalOrders = filteredOrders.length;
+  const totalValue = filteredOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+  const totalPCS = filteredOrders.reduce((sum, o) => sum + (o.total_pcs || 0), 0);
+  
+  const francoOrders = filteredOrders.filter(o => o.purchase_type === 'Franco');
+  const loccoOrders = filteredOrders.filter(o => o.purchase_type === 'Locco');
+  
+  const francoCount = francoOrders.length;
+  const francoValue = francoOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+  
+  const loccoCount = loccoOrders.length;
+  const loccoValue = loccoOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+  
+  const pendingCount = filteredOrders.filter(o => o.status === 'pending').length;
+  const inDeliveryCount = filteredOrders.filter(o => o.status === 'in_delivery').length;
+  const completedCount = filteredOrders.filter(o => o.status === 'completed').length;
+
   const columns: { key: keyof SalesOrder; label: string; align?: string }[] = [
     { key: 'order_date', label: 'Tgl Order' },
     { key: 'so_number', label: 'No SO' },
@@ -148,12 +164,11 @@ export default function SalesOrdersPage() {
     { key: 'total_pcs', label: 'Total PCS', align: 'right' },
     { key: 'uk', label: 'Uk' },
     { key: 'total_price', label: 'Total Harga', align: 'right' },
-    { key: 'purchase_type', label: 'Purchase' }, // 🔥 TARUH DI SINI
+    { key: 'purchase_type', label: 'Purchase' },
     { key: 'status', label: 'Status' },
   ];
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    // Update on Supabase
     const { error } = await supabase
       .from('sales_orders')
       .update({ status: newStatus })
@@ -165,7 +180,6 @@ export default function SalesOrdersPage() {
       return;
     }
 
-    // Update locally
     setOrders((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
     );
@@ -182,6 +196,61 @@ export default function SalesOrdersPage() {
         >
           + Add Sales Order
         </Link>
+      </div>
+
+      {/* 🔥 OVERVIEW CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+        {/* Total Orders */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Total SO</p>
+          <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
+        </div>
+
+        {/* Total Value */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
+          <p className="text-xl font-bold text-gray-800">
+            Rp {(totalValue / 1000000).toFixed(1)}M
+          </p>
+        </div>
+
+        {/* Total PCS */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Total PCS</p>
+          <p className="text-2xl font-bold text-gray-800">{totalPCS.toLocaleString()}</p>
+        </div>
+
+        {/* Franco */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
+          <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
+          <p className="text-xs text-gray-500">Rp {(francoValue / 1000000).toFixed(1)}M</p>
+        </div>
+
+        {/* Locco */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
+          <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
+          <p className="text-xs text-gray-500">Rp {(loccoValue / 1000000).toFixed(1)}M</p>
+        </div>
+
+        {/* Pending */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Pending</p>
+          <p className="text-2xl font-bold text-gray-700">{pendingCount}</p>
+        </div>
+
+        {/* In Delivery */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">In Delivery</p>
+          <p className="text-2xl font-bold text-yellow-700">{inDeliveryCount}</p>
+        </div>
+
+        {/* Completed */}
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Completed</p>
+          <p className="text-2xl font-bold text-green-700">{completedCount}</p>
+        </div>
       </div>
 
       {/* FILTERS */}
@@ -223,6 +292,9 @@ export default function SalesOrdersPage() {
         <table className="min-w-full bg-white shadow rounded-lg overflow-hidden">
           <thead className="bg-gray-100 text-gray-700 uppercase text-sm">
             <tr>
+              {/* 🔥 NOMOR KOLOM */}
+              <th className="p-3 text-left">No</th>
+              
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -241,13 +313,16 @@ export default function SalesOrdersPage() {
           <tbody>
             {filteredOrders.length === 0 && !loading ? (
               <tr>
-                <td colSpan={10} className="p-5 text-center text-gray-400">
+                <td colSpan={12} className="p-5 text-center text-gray-400">
                   Belum ada sales order
                 </td>
               </tr>
             ) : (
-              filteredOrders.map((o) => (
+              filteredOrders.map((o, index) => (
                 <tr key={o.id} className="border-b hover:bg-gray-50 transition">
+                  {/* 🔥 NOMOR URUT */}
+                  <td className="p-3 text-gray-600 font-medium">{index + 1}</td>
+                  
                   <td className="p-3">{o.order_date ? new Date(o.order_date).toLocaleDateString('id-ID') : '-'}</td>
                   <td className="p-3 font-medium">{o.so_number ?? '-'}</td>
                   <td className="p-3">{o.customer_order_ref ?? '-'}</td>
@@ -258,9 +333,8 @@ export default function SalesOrdersPage() {
                   <td className="p-3 text-right">{o.total_price?.toLocaleString('id-ID') ?? 0}</td>
                   
                   <td className="p-3 text-center">
-  <PurchaseBadge type={o.purchase_type} /> </td>
-
-
+                    <PurchaseBadge type={o.purchase_type} />
+                  </td>
 
                   <td className="p-3">
                     <select
