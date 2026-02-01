@@ -14,7 +14,7 @@ type DeliveryItem = {
   product_name: string;
   product_size: string;
   isi_per_palet: number;
-  return_pcs: number;// ⭐ ini udah ada dari API
+  return_pcs: number; // ⭐ ini udah ada dari API
 };
 
 type DeliveryReturnItem = {

@@ -100,7 +100,6 @@ const supabaseAdmin = createClient(
         sj_number: delivery.sj_number,
         transaction_date: delivery.delivery_date || salesOrder?.order_date || new Date(),
         so_number: salesOrder?.so_number ?? "-",
-        supplier_name: "PT Bata Indonesia",
         kepada: customerName,
         ship_to_name: salesOrder?.ship_to_name ?? "-",
         alamat: salesOrder?.delivery_address ?? "-",
