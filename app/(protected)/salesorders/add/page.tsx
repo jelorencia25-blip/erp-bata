@@ -166,6 +166,7 @@ copy[idx].unit_price = unitPrice;
 // 3️⃣ Total harga (YANG BERUBAH)
 copy[idx].total =  qtyPcs * unitPrice;
 
+
 setItems(copy);
 };
 
