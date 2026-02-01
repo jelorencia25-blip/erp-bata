@@ -210,7 +210,7 @@ export default function SalesOrdersPage() {
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
           <p className="text-xl font-bold text-gray-800">
-            Rp {(totalValue / 1000000).toFixed(1)}M
+            Rp {(totalValue / 1000000).toFixed(1)}JT
           </p>
         </div>
 
@@ -224,14 +224,14 @@ export default function SalesOrdersPage() {
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
           <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
-          <p className="text-xs text-gray-500">Rp {(francoValue / 1000000).toFixed(1)}M</p>
+          <p className="text-xs text-gray-500">Rp {(francoValue / 1000000).toFixed(1)}JT</p>
         </div>
 
         {/* Locco */}
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
           <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
-          <p className="text-xs text-gray-500">Rp {(loccoValue / 1000000).toFixed(1)}M</p>
+          <p className="text-xs text-gray-500">Rp {(loccoValue / 1000000).toFixed(1)}JT</p>
         </div>
 
         {/* Pending */}
