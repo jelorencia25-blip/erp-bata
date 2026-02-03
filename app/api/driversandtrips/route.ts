@@ -24,7 +24,9 @@ const supabase = createClient(
         vehicles ( plate_number ),
         sales_orders ( ship_to_name, delivery_address )
       `)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .eq("final_status", "final");
+  
 
     if (deliveryError) {
       console.error("Delivery fetch error:", deliveryError);

@@ -16,6 +16,7 @@ type Row = {
   kubik_m3?: number | string;
   supir: string;
   plat_mobil: string;
+  final_status: "draft" | "final";
 };
 
 type SortKey = keyof Row;
@@ -31,37 +32,68 @@ export default function DeliveriesPage() {
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // SORT STATE
+  const [confirmRow, setConfirmRow] = useState<Row | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // SEARCH
+  const [search, setSearch] = useState("");
+
+  // SORT
   const [sortKey, setSortKey] = useState<SortKey>("so_number");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
+  // FETCH
   const fetchData = async (activeTab: "pending" | "processed") => {
-    setLoading(true);
+  setLoading(true);
 
-    const url =
-      activeTab === "pending"
-        ? "/api/deliveries/pending"
-        : "/api/deliveries/processed";
+  const url =
+    activeTab === "pending"
+      ? "/api/deliveries/pending"
+      : "/api/deliveries/processed";
 
-    try {
-      const res = await fetch(url);
-      const json = await res.json();
-      setData(Array.isArray(json) ? json : []);
-    } catch {
-      setData([]);
-    }
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
 
-    setLoading(false);
-  };
+    const cleaned = Array.isArray(json)
+      ? json.filter(row => row.so_status !== "cancelled")
+      : [];
+
+    setData(cleaned);
+  } catch {
+    setData([]);
+  }
+
+  setLoading(false);
+};
 
   useEffect(() => {
     fetchData(tab);
     router.replace(`/deliveries?tab=${tab}`);
   }, [tab]);
 
-  // SORTED DATA
-  const sortedData = useMemo(() => {
-    const sorted = [...data];
+  // OVERVIEW
+  const overview = useMemo(() => {
+    const total = data.length;
+    const finalCount = data.filter(d => d.final_status === "final").length;
+    const draftCount = total - finalCount;
+
+    return { total, final: finalCount, draft: draftCount };
+  }, [data]);
+
+  // FILTER + SORT
+  const filteredAndSortedData = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    const filtered = data.filter(row =>
+      row.sj_number?.toLowerCase().includes(keyword) ||
+      row.pelanggan?.toLowerCase().includes(keyword) ||
+      row.kepada?.toLowerCase().includes(keyword) ||
+      row.supir?.toLowerCase().includes(keyword) ||
+      row.plat_mobil?.toLowerCase().includes(keyword)
+    );
+
+    const sorted = [...filtered];
 
     sorted.sort((a: any, b: any) => {
       const aVal = a[sortKey];
@@ -70,19 +102,17 @@ export default function DeliveriesPage() {
       if (aVal == null) return 1;
       if (bVal == null) return -1;
 
-      // NUMBER
       if (typeof aVal === "number" && typeof bVal === "number") {
         return sortDir === "asc" ? aVal - bVal : bVal - aVal;
       }
 
-      // STRING
       return sortDir === "asc"
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
     });
 
     return sorted;
-  }, [data, sortKey, sortDir]);
+  }, [data, search, sortKey, sortDir]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -114,7 +144,7 @@ export default function DeliveriesPage() {
   return (
     <div className="p-6">
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-2xl font-bold">Deliveries</h1>
           <p className="text-gray-500">
@@ -143,11 +173,40 @@ export default function DeliveriesPage() {
         </div>
       </div>
 
+      {/* OVERVIEW */}
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="bg-white rounded shadow p-4">
+          <p className="text-gray-500 text-sm">Total SJ</p>
+          <p className="text-2xl font-bold">{overview.total}</p>
+        </div>
+
+        <div className="bg-yellow-100 rounded shadow p-4">
+          <p className="text-yellow-700 text-sm">Belum Final</p>
+          <p className="text-2xl font-bold">{overview.draft}</p>
+        </div>
+
+        <div className="bg-green-100 rounded shadow p-4">
+          <p className="text-green-700 text-sm">Sudah Final</p>
+          <p className="text-2xl font-bold">{overview.final}</p>
+        </div>
+      </div>
+
+      {/* SEARCH */}
+      <div className="mb-3">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Cari No SJ, Supplier, Kepada, Supir, Plat..."
+          className="w-full border rounded px-3 py-2 text-sm"
+        />
+      </div>
+
       {/* TABLE */}
       <div className="bg-white rounded shadow overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-200">
             <tr>
+              <th className="p-3 text-center w-20">Action</th>
               <SortTh label="No SJ" col="sj_number" />
               <SortTh label="No SO" col="so_number" />
               <SortTh label="Supplier" col="pelanggan" />
@@ -156,7 +215,7 @@ export default function DeliveriesPage() {
               <SortTh label="Uk" col="ukuran" align="center" />
               <SortTh label="PCS" col="total_pcs" align="right" />
               <SortTh label="Palet" col="palet" align="center" />
-              <SortTh label="Kubik (m³ / palet)" col="kubik_m3" align="right" />
+              <SortTh label="Kubik" col="kubik_m3" align="right" />
               <SortTh label="Supir" col="supir" />
               <SortTh label="Plat" col="plat_mobil" />
               <th className="p-3"></th>
@@ -172,7 +231,7 @@ export default function DeliveriesPage() {
               </tr>
             )}
 
-            {!loading && sortedData.length === 0 && (
+            {!loading && filteredAndSortedData.length === 0 && (
               <tr>
                 <td colSpan={12} className="p-4 text-center">
                   Tidak ada data
@@ -180,8 +239,24 @@ export default function DeliveriesPage() {
               </tr>
             )}
 
-            {sortedData.map((row) => (
+            {filteredAndSortedData.map(row => (
               <tr key={row.id} className="border-t">
+                <td className="p-3 text-center">
+                  {tab === "processed" &&
+                    (row.final_status === "draft" ? (
+                      <button
+                        onClick={() => setConfirmRow(row)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-xs"
+                      >
+                        DONE
+                      </button>
+                    ) : (
+                      <span className="text-green-600 font-semibold text-xs">
+                        FINAL
+                      </span>
+                    ))}
+                </td>
+
                 <td className="p-3">{row.sj_number}</td>
                 <td className="p-3">{row.so_number}</td>
                 <td className="p-3">{row.pelanggan}</td>
@@ -192,14 +267,10 @@ export default function DeliveriesPage() {
                   {row.total_pcs.toLocaleString()}
                 </td>
                 <td className="p-3 text-center">{row.palet}</td>
-
-                {/* 🔥 KUBIK – TIDAK DIHITUNG, TIDAK DIFIX */}
-                <td className="p-3 text-right">
-                  {row.kubik_m3 ?? "-"}
-                </td>
-
+                <td className="p-3 text-right">{row.kubik_m3 ?? "-"}</td>
                 <td className="p-3">{row.supir}</td>
                 <td className="p-3">{row.plat_mobil}</td>
+
                 <td className="p-3 text-right">
                   {tab === "pending" && (
                     <button

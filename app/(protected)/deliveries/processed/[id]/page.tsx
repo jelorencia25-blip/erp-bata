@@ -14,12 +14,12 @@ type DeliveryItem = {
   product_name: string;
   product_size: string;
   isi_per_palet: number;
-  return_pcs: number; // ⭐ ini udah ada dari API
+  return_pcs: number;
 };
 
 type DeliveryReturnItem = {
   id: string;
-  product_id: string; // ⭐ pake product_id bukan delivery_item_id
+  product_id: string;
   return_pcs: number;
   return_reason?: string;
 };
@@ -83,11 +83,10 @@ export default function DeliveryProcessedDetailPage() {
         setDriverId(json.staff?.id ?? "");
         setVehicleId(json.vehicle?.id ?? "");
 
-        // ⭐ FIX: Map by product_id dan ambil return_pcs dari delivery_items
         const initialReturns: Record<string, { qty: number; reason: string }> = {};
         json.delivery_items.forEach(item => {
           initialReturns[item.id] = {
-            qty: item.return_pcs || 0, // ⭐ ambil dari delivery_items yang udah di-enrich
+            qty: item.return_pcs || 0,
             reason: ""
           };
         });
@@ -112,14 +111,14 @@ export default function DeliveryProcessedDetailPage() {
     setSaving(true);
     try {
       const res = await fetch(`/api/deliveries/processed/${id}`, {
-  method: "PUT",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ 
-    driver_id: driverId, 
-    vehicle_id: vehicleId, 
-    returns 
-  }),
-});
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          driver_id: driverId, 
+          vehicle_id: vehicleId, 
+          returns 
+        }),
+      });
       const result = await res.json();
       if (!res.ok) {
         alert(result.error || "Gagal update delivery");
@@ -186,88 +185,87 @@ export default function DeliveryProcessedDetailPage() {
       </div>
 
       <div id="print-content" className="bg-white rounded-lg shadow-sm p-8">
-        <div className="text-center border-b-2 border-gray-300 pb-6 mb-6">
-          <h1 className="text-2xl font-bold mb-2">
+        <div className="text-center border-b-2 border-gray-300 pb-3 mb-4">
+          <h1 className="text-2xl font-bold">
             Surat Jalan – {data.sj_number}
           </h1>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1 mb-4">
           <div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Nomor SO</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Nomor SO</span>
               <span className="flex-1">{data.so_number}</span>
             </div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Supplier</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Supplier</span>
               <span className="flex-1">{data.customer_name}</span>
             </div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Purchase Type</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Purchase Type</span>
               <span className="flex-1">{data.purchase_type}</span>
             </div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Telp</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Telp</span>
               <span className="flex-1">{data.contact_phone || "-"}</span>
             </div>
           </div>
 
           <div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Tanggal SO</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Tanggal SO</span>
               <span className="flex-1">{data.order_date}</span>
             </div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">No Ref Supplier</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">No Ref Supplier</span>
               <span className="flex-1">{data.customer_order_ref}</span>
             </div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Kepada</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Kepada</span>
               <span className="flex-1">{data.ship_to_name || "-"}</span>
             </div>
-            <div className="flex border-b border-gray-200 py-2">
-              <span className="font-semibold w-40">Catatan</span>
+            <div className="flex border-b border-gray-200 py-1">
+              <span className="font-semibold w-36">Catatan</span>
               <span className="flex-1">{data.notes || "-"}</span>
             </div>
           </div>
         </div>
 
-        <div className="mb-6">
-          <div className="flex border-b border-gray-200 py-2">
-            <span className="font-semibold w-32">Alamat</span>
+        <div className="mb-3">
+          <div className="flex border-b border-gray-200 py-1">
+            <span className="font-semibold w-24">Alamat</span>
             <span className="flex-1">{data.delivery_address || "-"}</span>
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-3">
           <table className="w-full border-collapse border border-gray-300">
             <thead className="bg-gray-800 text-white">
               <tr>
-                <th className="border border-gray-300 px-4 py-2 text-center">No</th>
-                <th className="border border-gray-300 px-4 py-2 text-left">Barang / Ukuran</th>
-                <th className="border border-gray-300 px-4 py-2 text-center">Isi / Palet</th>
-                <th className="border border-gray-300 px-4 py-2 text-center">Palet</th>
-                <th className="border border-gray-300 px-4 py-2 text-center">PCS</th>
+                <th className="border border-gray-300 px-2 py-1 text-center">No</th>
+                <th className="border border-gray-300 px-3 py-1 text-left">Barang / Ukuran</th>
+                <th className="border border-gray-300 px-2 py-1 text-center">Isi/Palet</th>
+                <th className="border border-gray-300 px-2 py-1 text-center">Palet</th>
+                <th className="border border-gray-300 px-2 py-1 text-center">PCS</th>
               </tr>
             </thead>
             <tbody>
               {data.delivery_items.map((item, idx) => (
                 <tr key={item.id}>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-1 text-center">
                     {idx + 1}
                   </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {/* ⭐ FIX: Tampilkan product_name + product_size dengan handling null */}
+                  <td className="border border-gray-300 px-3 py-1">
                     {item.product_name || "-"} 
                     {item.product_size && item.product_size !== "-" ? ` (${item.product_size})` : ""}
                   </td>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-1 text-center">
                     {item.isi_per_palet > 0 ? item.isi_per_palet : "-"}
                   </td>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-1 text-center">
                     {item.pallet_qty}
                   </td>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-1 text-center">
                     {item.total_pcs}
                   </td>
                 </tr>
@@ -276,26 +274,23 @@ export default function DeliveryProcessedDetailPage() {
           </table>
         </div>
 
-        <div className="mb-8">
-          <h3 className="font-bold text-lg mb-4 bg-gray-800 text-white px-4 py-2">
-            Return Barang
-          </h3>
+        <div className="mb-3">
+         
           <table className="w-full border-collapse border border-gray-300">
             <thead className="bg-gray-100">
               <tr>
-                <th className="border px-4 py-2 text-left">Barang</th>
-                <th className="border px-4 py-2 text-center w-32">Return (PCS)</th>
+                <th className="border px-3 py-1 text-left">Retur Barang</th>
+                <th className="border px-2 py-1 text-center w-24">PCS</th>
               </tr>
             </thead>
             <tbody>
               {data.delivery_items.map((item) => (
                 <tr key={item.id}>
-                  <td className="border px-4 py-2">
-                    {/* ⭐ Sama handling null-nya */}
+                  <td className="border px-3 py-1">
                     {item.product_name || "-"}
                     {item.product_size && item.product_size !== "-" ? ` (${item.product_size})` : ""}
                   </td>
-                  <td className="border px-4 py-2 text-center">
+                  <td className="border px-2 py-1 text-center">
                     <span className="print:hidden">
                       <input
                         type="number"
@@ -324,9 +319,9 @@ export default function DeliveryProcessedDetailPage() {
           </table>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-2 gap-6 mb-4">
           <div>
-            <label className="block font-semibold mb-2">Supir</label>
+            <label className="block font-semibold mb-1">Supir</label>
             <div className="print:hidden">
               <select 
                 value={driverId} 
@@ -339,13 +334,13 @@ export default function DeliveryProcessedDetailPage() {
                 ))}
               </select>
             </div>
-            <div className="hidden print:block border-b border-gray-300 py-2">
+            <div className="hidden print:block border-b border-gray-300 py-1">
               {drivers.find(d => d.id === driverId)?.name || "-"}
             </div>
           </div>
 
           <div>
-            <label className="block font-semibold mb-2">Plat Mobil</label>
+            <label className="block font-semibold mb-1">Plat Mobil</label>
             <div className="print:hidden">
               <select 
                 value={vehicleId} 
@@ -358,68 +353,217 @@ export default function DeliveryProcessedDetailPage() {
                 ))}
               </select>
             </div>
-            <div className="hidden print:block border-b border-gray-300 py-2">
+            <div className="hidden print:block border-b border-gray-300 py-1">
               {vehicles.find(v => v.id === vehicleId)?.plate_number || "-"}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-6 mt-12 pt-8 border-t-2 border-gray-300">
+        <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t-2 border-gray-300">
           <div className="text-center">
-            <p className="font-semibold mb-16">Tanda Terima</p>
-            <div className="border-t border-gray-400 pt-2">
-              <p className="text-sm">(...........................)</p>
-            </div>
+            <p className="font-semibold mb-7">Tanda Terima</p>
+           
+              <p className="text-sm">(.....................)</p>
+          
           </div>
           
           <div className="text-center">
-            <p className="font-semibold mb-16">Supir</p>
-            <div className="border-t border-gray-400 pt-2">
+            <p className="font-semibold mb-7">Supir</p>
+           
               <p className="text-sm">
-                ({drivers.find(d => d.id === driverId)?.name || "..........................."})
+                ({drivers.find(d => d.id === driverId)?.name || "....................."})
               </p>
-            </div>
+            
           </div>
           
           <div className="text-center">
-            <p className="font-semibold mb-16">Dibuat Oleh</p>
-            <div className="border-t border-gray-400 pt-2">
-              <p className="text-sm">(...........................)</p>
-            </div>
+            <p className="font-semibold mb-7">Dibuat Oleh</p>
+            
+              <p className="text-sm">(.....................)</p>
+            
           </div>
           
           <div className="text-center">
-            <p className="font-semibold mb-16">Security</p>
-            <div className="border-t border-gray-400 pt-2">
-              <p className="text-sm">(...........................)</p>
-            </div>
+            <p className="font-semibold mb-7">Security</p>
+          
+              <p className="text-sm">(.....................)</p>
+           
           </div>
         </div>
       </div>
 
       <style jsx global>{`
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 0.4in 0.3in;
+          }
+          
           body * {
             visibility: hidden;
           }
+          
           #print-content,
           #print-content * {
             visibility: visible;
           }
+          
           #print-content {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            max-height: 5.5in;
           }
+          
+          /* Font sizes untuk 3-ply yang lebih besar */
+          #print-content {
+            font-size: 13pt !important;
+            line-height: 1.15 !important;
+          }
+          
+          #print-content h1 {
+            font-size: 18pt !important;
+            font-weight: bold !important;
+            margin-bottom: 4pt !important;
+            padding-bottom: 4pt !important;
+          }
+          
+          #print-content h3 {
+            font-size: 14pt !important;
+            font-weight: bold !important;
+            padding: 3pt 6pt !important;
+            margin-bottom: 3pt !important;
+          }
+          
+          /* Kompres spacing antar section */
+          #print-content .grid {
+            gap: 2pt !important;
+          }
+          
+          #print-content .mb-3,
+          #print-content .mb-4 {
+            margin-bottom: 4pt !important;
+          }
+          
+          #print-content .pb-3 {
+            padding-bottom: 3pt !important;
+          }
+          
+          #print-content .py-1 {
+            padding-top: 2pt !important;
+            padding-bottom: 2pt !important;
+          }
+          
+          #print-content .gap-x-8 {
+            column-gap: 12pt !important;
+          }
+          
+          #print-content .gap-y-1 {
+            row-gap: 1pt !important;
+          }
+          
+          /* Table styling untuk keterbacaan */
+          #print-content table {
+            font-size: 12pt !important;
+            border-collapse: collapse !important;
+            border: 2pt solid #000 !important;
+            line-height: 1.1 !important;
+          }
+          
+          #print-content thead {
+            background-color: #000 !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
+          #print-content th {
+            font-size: 13pt !important;
+            font-weight: bold !important;
+            padding: 3pt 4pt !important;
+            border: 2pt solid #000 !important;
+            line-height: 1.1 !important;
+          }
+          
+          #print-content td {
+            padding: 2pt 4pt !important;
+            border: 1pt solid #000 !important;
+            line-height: 1.1 !important;
+          }
+          
+          /* Label dan value */
+          #print-content .font-semibold {
+            font-weight: bold !important;
+            font-size: 13pt !important;
+          }
+          
+          /* Border untuk data rows */
+          #print-content .border-b {
+            border-bottom: 1pt solid #333 !important;
+          }
+          
+          #print-content .border-t-2 {
+            border-top: 2pt solid #000 !important;
+          }
+          
+          /* Signature section - kompres vertical space */
+          #print-content .mt-6 {
+            margin-top: 6pt !important;
+          }
+          
+          #print-content .pt-4 {
+            padding-top: 4pt !important;
+          }
+          
+          #print-content .mb-10 {
+            margin-bottom: 16pt !important;
+          }
+          
+          #print-content .mb-1 {
+            margin-bottom: 1pt !important;
+          }
+          
+          #print-content .mb-2 {
+            margin-bottom: 2pt !important;
+          }
+          
+          #print-content .gap-4 {
+            gap: 8pt !important;
+          }
+          
+          #print-content .gap-6 {
+            gap: 12pt !important;
+          }
+          
+          #print-content .text-sm {
+            font-size: 11pt !important;
+          }
+          
+          #print-content .text-base {
+            font-size: 13pt !important;
+          }
+          
+          /* Utility classes */
           .print\\:hidden {
             display: none !important;
           }
+          
           .print\\:block {
             display: block !important;
           }
+          
           .print\\:inline {
             display: inline !important;
+          }
+          
+          /* Pastikan background color tercetak */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
         }
       `}</style>

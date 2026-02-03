@@ -30,6 +30,10 @@ export default function ReturnsPage() {
   const [sortKey, setSortKey] = useState<SortKey>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -49,41 +53,66 @@ export default function ReturnsPage() {
 
   /* ================= FILTER + SORT ================= */
   const filteredData = useMemo(() => {
-    let result = [...data];
+  let result = [...data];
 
-    if (supplierFilter) {
-      const keyword = supplierFilter.toLowerCase();
-      result = result.filter((r) =>
-        r.customer_name?.toLowerCase().includes(keyword)
+  /* 🔎 SEARCH: supplier / SJ / SO */
+  if (search) {
+    const keyword = search.toLowerCase();
+    result = result.filter((r) =>
+      r.customer_name?.toLowerCase().includes(keyword) ||
+      r.sj_number?.toLowerCase().includes(keyword) ||
+      r.so_number?.toLowerCase().includes(keyword)
+    );
+  }
+
+  /* 📅 DATE RANGE FILTER */
+  if (dateFrom || dateTo) {
+    result = result.filter((r) => {
+      if (!r.tanggal) return false;
+
+      const rowDate = new Date(r.tanggal).setHours(0, 0, 0, 0);
+      const from = dateFrom
+        ? new Date(dateFrom).setHours(0, 0, 0, 0)
+        : null;
+      const to = dateTo
+        ? new Date(dateTo).setHours(23, 59, 59, 999)
+        : null;
+
+      return (
+        (!from || rowDate >= from) &&
+        (!to || rowDate <= to)
       );
-    }
+    });
+  }
 
-    if (sortKey) {
-      result.sort((a, b) => {
-        const valA = a[sortKey];
-        const valB = b[sortKey];
+  /* ↕ SORT */
+  if (sortKey) {
+    result.sort((a, b) => {
+      const valA = a[sortKey];
+      const valB = b[sortKey];
 
-        if (valA == null) return 1;
-        if (valB == null) return -1;
+      if (valA == null) return 1;
+      if (valB == null) return -1;
 
-        if (sortKey === 'tanggal' || sortKey === 'created_at') {
-          const timeA = new Date(valA as string).getTime();
-          const timeB = new Date(valB as string).getTime();
-          return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-        }
+      if (sortKey === 'tanggal' || sortKey === 'created_at') {
+        const timeA = new Date(valA as string).getTime();
+        const timeB = new Date(valB as string).getTime();
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
 
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          return sortOrder === 'asc' ? valA - valB : valB - valA;
-        }
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sortOrder === 'asc' ? valA - valB : valB - valA;
+      }
 
-        return sortOrder === 'asc'
-          ? String(valA).localeCompare(String(valB))
-          : String(valB).localeCompare(String(valA));
-      });
-    }
+      return sortOrder === 'asc'
+        ? String(valA).localeCompare(String(valB))
+        : String(valB).localeCompare(String(valA));
+    });
+  }
 
-    return result;
-  }, [data, supplierFilter, sortKey, sortOrder]);
+  return result;
+}, [data, search, dateFrom, dateTo, sortKey, sortOrder]);
+
 
   const totalPcs = filteredData.reduce((s, r) => s + r.return_pcs, 0);
   const grandTotal = filteredData.reduce((s, r) => s + r.total, 0);
@@ -156,22 +185,47 @@ export default function ReturnsPage() {
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Filter supplier..."
-            value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
-            className="border rounded px-3 py-2 text-sm"
-          />
+     <div className="flex flex-col md:flex-row gap-2">
+  <input
+    type="text"
+    placeholder="Cari Supplier / No SJ / No SO"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="border rounded px-3 py-2 text-sm"
+  />
 
-          <button
-            onClick={downloadExcel}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
-          >
-            Download Excel
-          </button>
-        </div>
+  <input
+    type="date"
+    value={dateFrom}
+    onChange={(e) => setDateFrom(e.target.value)}
+    className="border rounded px-3 py-2 text-sm"
+  />
+
+  <input
+    type="date"
+    value={dateTo}
+    onChange={(e) => setDateTo(e.target.value)}
+    className="border rounded px-3 py-2 text-sm"
+  />
+
+  <button
+    onClick={() => {
+      setSearch('');
+      setDateFrom('');
+      setDateTo('');
+    }}
+    className="bg-gray-200 hover:bg-gray-300 rounded px-3 py-2 text-sm"
+  >
+    Reset
+  </button>
+
+  <button
+    onClick={downloadExcel}
+    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
+  >
+    Download Excel
+  </button>
+</div>
       </div>
 
       <div className="overflow-x-auto shadow-lg rounded-lg border border-gray-200">

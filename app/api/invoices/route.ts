@@ -31,6 +31,7 @@ const supabase = createClient(
           )
         )
       `)
+      .eq("final_status", "final") 
       .not("sj_number", "is", null)
       .order("delivery_date", { ascending: false });
 

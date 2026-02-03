@@ -20,6 +20,10 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
 
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   /* ================= FETCH DATA ================= */
   const fetchData = async () => {
     setLoading(true);
@@ -49,12 +53,26 @@ export default function PaymentsPage() {
 
   /* ================= FILTER DATA (SOURCE OF TRUTH) ================= */
   const filteredData = useMemo(() => {
-    if (!filter) return data;
+  return data.filter((d) => {
+    // 🔎 search SJ / Supplier
+    const keyword = search.toLowerCase();
+    const matchSearch =
+      !keyword ||
+      d.no_sj.toLowerCase().includes(keyword) ||
+      d.supplier.toLowerCase().includes(keyword);
 
-    return data.filter((d) =>
-      d.supplier.toLowerCase().includes(filter.toLowerCase())
-    );
-  }, [data, filter]);
+    // 📅 filter tanggal
+    const rowDate = d.tgl ? new Date(d.tgl).setHours(0, 0, 0, 0) : null;
+    const from = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
+    const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
+
+    const matchDate =
+      (!from || (rowDate && rowDate >= from)) &&
+      (!to || (rowDate && rowDate <= to));
+
+    return matchSearch && matchDate;
+  });
+}, [data, search, dateFrom, dateTo]);
 
   /* ================= OVERVIEW (BASED ON FILTER) ================= */
   const overview = useMemo(() => {
@@ -106,13 +124,40 @@ export default function PaymentsPage() {
       </div>
 
       {/* FILTER */}
-      <input
-        type="text"
-        placeholder="Filter Nama Customer"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300"
-      />
+      <div className="flex flex-col md:flex-row gap-2 mb-4">
+  <input
+    type="text"
+    placeholder="Cari No SJ / Nama Supplier"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300"
+  />
+
+  <input
+    type="date"
+    value={dateFrom}
+    onChange={(e) => setDateFrom(e.target.value)}
+    className="border rounded-lg px-4 py-2"
+  />
+
+  <input
+    type="date"
+    value={dateTo}
+    onChange={(e) => setDateTo(e.target.value)}
+    className="border rounded-lg px-4 py-2"
+  />
+
+  <button
+    onClick={() => {
+      setSearch('');
+      setDateFrom('');
+      setDateTo('');
+    }}
+    className="bg-gray-200 hover:bg-gray-300 rounded px-4 py-2"
+  >
+    Reset Filter
+  </button>
+</div>
 
       {/* TABLE */}
       <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -123,7 +168,7 @@ export default function PaymentsPage() {
                 "No",
                 "No SJ",
                 "Tgl",
-                "Customer",
+                "Supplier",
                 "Ref Supplier",
                 "Kepada",
                 "Total Tagihan",

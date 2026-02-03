@@ -12,23 +12,31 @@ export async function GET() {
 );
   try {
     // 1️⃣ Ambil semua delivery return items
-    const { data: returnItems, error } = await supabaseAdmin
-      .from("delivery_return_items")
-      .select(`
-        id,
-        delivery_order_id,
-        product_id,
-        return_pcs,
-        return_reason,
-        created_at
-      `)
-      .order("created_at", { ascending: false });
+   const { data: returnItems, error } = await supabaseAdmin
+  .from("delivery_return_items")
+  .select(`
+    id,
+    delivery_order_id,
+    product_id,
+    return_pcs,
+    return_reason,
+    created_at,
+    delivery_orders!inner (
+      id,
+      final_status,
+      sj_number,
+      sales_order_id,
+      delivery_date
+    )
+  `)
+  .eq("delivery_orders.final_status", "final")
+  .order("created_at", { ascending: false });
 
-    if (error) throw error;
+if (error) throw error;
 
-    if (!returnItems || returnItems.length === 0) {
-      return NextResponse.json([]);
-    }
+if (!returnItems || returnItems.length === 0) {
+  return NextResponse.json([]);
+}
 
     // 2️⃣ Enrich setiap return item dengan data lengkap
     const enrichedData = await Promise.all(

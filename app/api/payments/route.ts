@@ -15,10 +15,13 @@ const supabase = createClient(
 
 
   try {
-    const { data: deliveries, error } = await supabase
-      .from("delivery_orders")
-      .select("id, sj_number, delivery_date, sales_order_id")
-      .order("delivery_date", { ascending: false });
+  const { data: deliveries, error } = await supabase
+  .from("delivery_orders")
+  .select("id, sj_number, delivery_date, sales_order_id")
+  .eq("final_status", "final") // ✅ TANPA PREFIX
+  .order("delivery_date", { ascending: false });
+
+if (error) throw error;
 
     if (error) throw error;
 

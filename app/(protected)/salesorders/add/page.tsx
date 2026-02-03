@@ -38,6 +38,27 @@ type Product = {
   status: string;
 };
 
+type Deposit = {
+  id: string;
+  deposit_code: string;
+  price_lock_per_m3: number;
+  do_remaining: number;
+
+};
+
+type SalesOrderItem = {
+  product_id: string;
+  m3: number;
+  pallet_size: number;
+  qty_pallet: number;
+  qty_pcs: number;
+  price_m3: number;
+  unit_price: number;
+  total: number;
+};
+
+
+
 /* ======================
    Form Row
 ====================== */
@@ -69,6 +90,8 @@ export default function AddSalesOrderPage() {
   const [purchaseType, setPurchaseType] = useState<'Franco' | 'Locco'>('Franco');
   const [notes, setNotes] = useState('');
 
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
+const [selectedDepositId, setSelectedDepositId] = useState<string | null>(null);
   
   /* ======================
      MASTER DATA
@@ -104,6 +127,23 @@ export default function AddSalesOrderPage() {
     },
   ]);
 
+
+  const handleSelectDeposit = (deposit: Deposit | null) => {
+  if (!deposit) return;
+
+  setItems(prev =>
+    prev.map(item => ({
+      ...item,
+      // 🔥 JANGAN overwrite kalau user sudah isi manual
+      price_m3:
+        item.price_m3 && item.price_m3 > 0
+          ? item.price_m3
+          : deposit.price_lock_per_m3,
+    }))
+  );
+};
+  
+
   /* ======================
      INIT
   ====================== */
@@ -138,6 +178,32 @@ export default function AddSalesOrderPage() {
     };
     fetchProducts();
   }, []);
+
+ // FETCH DEPOSITS
+
+ useEffect(() => {
+  if (!selectedSupplierId) {
+    setDeposits([]);
+    setSelectedDepositId(null);
+    return;
+  }
+
+  const fetchDeposits = async () => {
+    const res = await fetch(
+      `/api/deposits/active?customer_id=${selectedSupplierId}`
+    );
+    const data = await res.json();
+    setDeposits(data);
+  };
+
+  fetchDeposits();
+}, [selectedSupplierId]);
+
+ // fetch harga deposit
+useEffect(() => {
+  const dep = deposits.find(d => d.id === selectedDepositId) ?? null;
+  handleSelectDeposit(dep);
+}, [selectedDepositId]);
 
   /* ======================
      UPDATE ITEM (PCS AUTO)
@@ -193,36 +259,46 @@ setItems(copy);
     return;
   }
 
-
-  // 🔥 TAMBAHKAN INI
   console.log("FINAL selectedSupplierId:", selectedSupplierId);
   console.log("UUID CHECK:", /^[0-9a-f-]{36}$/i.test(selectedSupplierId));
 
-  const payload = {
-  customer_id: selectedSupplierId,
-  ship_to_name: form.to || null,
-  contact_phone: form.phone || null,
-  delivery_address: form.address || null,
-  customer_order_ref: form.ref_customer || "",
-  purchase_type: purchaseType,
-  notes: notes,
+  // 🔥 FIX: 1 SO = 1 DO (bukan sum pallet)
+  const selectedDeposit = deposits.find(d => d.id === selectedDepositId);
+  const depositDoUsed = selectedDeposit ? 1 : 0;  // ✅ SELALU 1 kalau pakai deposit
+  const depositAmountUsed = selectedDeposit ? grandTotal : 0;
 
-  items: items
-    .filter(i => i.product_id)
-    .map(i => ({
-      product_id: i.product_id,
-      pallet_qty: Number(i.qty_pallet),
-      total_pcs: Number(i.qty_pcs),          // 🔥 WAJIB
-      price_per_m3: Number(i.price_m3),
-      total_price: Number(i.total),          // 🔥 WAJIB
-      total_m3: Number(i.m3),                // optional
-    })),
-};
+  const payload = {
+    customer_id: selectedSupplierId,
+    ship_to_name: form.to || null,
+    contact_phone: form.phone || null,
+    delivery_address: form.address || null,
+    customer_order_ref: form.ref_customer || "",
+    purchase_type: purchaseType,
+    notes: notes,
+
+    items: items
+      .filter(i => i.product_id)
+      .map(i => ({
+        product_id: i.product_id,
+        pallet_qty: Number(i.qty_pallet),
+        total_pcs: Number(i.qty_pcs),
+        price_per_m3: Number(i.price_m3),
+        total_price: Number(i.total),
+        total_m3: Number(i.m3),
+      })),
+
+    // 🔥 DEPOSIT DATA
+    deposit_id: selectedDepositId || null,
+    deposit_do_used: depositDoUsed,  // ✅ Selalu 1
+    deposit_amount_used: depositAmountUsed,
+  };
 
   console.log("FINAL PAYLOAD:", JSON.stringify(payload, null, 2));
-
-
-  console.log("PAYLOAD KIRIM KE API:", payload);
+  console.log("DEPOSIT DATA:", {
+    deposit_id: payload.deposit_id,
+    do_used: payload.deposit_do_used,
+    amount_used: payload.deposit_amount_used,
+  });
 
   if (!payload.items.length) {
     alert("Minimal satu produk harus diisi");
@@ -324,6 +400,7 @@ setItems(copy);
 
 
 
+
         <FormRow label="Nomor Ref Supplier">
           <input
             value={form.ref_customer}
@@ -346,6 +423,27 @@ setItems(copy);
     <option value="Locco">Locco</option>
   </select>
 </FormRow>
+
+<FormRow label="Deposit">
+  <select
+    value={selectedDepositId ?? ""}
+    onChange={(e) =>
+      setSelectedDepositId(e.target.value || null)
+    }
+    className="w-full border rounded px-2 py-1"
+  >
+    <option value="">-- Tanpa Deposit --</option>
+
+    {deposits.map((d) => (
+    <option key={d.id} value={d.id}>
+  {d.deposit_code}
+  {" | Sisa "}{d.do_remaining} DO
+  {" | Rp "}{rupiah(d.price_lock_per_m3)}
+</option>
+    ))}
+  </select>
+</FormRow>
+
 
 
       </div>
@@ -414,12 +512,13 @@ setItems(copy);
   setItems(prev => {
     const copy = [...prev];
     copy[i] = {
+      ...copy[i],
       product_id: p.id,          // UUID ONLY
       m3: p.kubik_m3,
       pallet_size: p.isi_per_palet,
       qty_pallet: 1,
       qty_pcs: p.isi_per_palet,
-      price_m3: 0,
+      price_m3: copy[i]?.price_m3 || 0,
       unit_price: 0,
       total: 0,
     };

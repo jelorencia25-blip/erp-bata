@@ -20,6 +20,10 @@ export default function InvoicesPage() {
   const [filter, setFilter] = useState("");
   const router = useRouter();
 
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
   /* ================= FETCH ================= */
   useEffect(() => {
     fetch("/api/invoices")
@@ -32,14 +36,36 @@ export default function InvoicesPage() {
 
   /* ================= FILTER ================= */
   const filteredRows = useMemo(() => {
-    if (!filter) return rows;
-
-    return rows.filter((r) =>
+  return rows.filter((r) => {
+    // 🔎 Search: customer name / SJ
+    const keyword = search.toLowerCase();
+    const matchSearch =
+      !keyword ||
+      r.sj_number?.toLowerCase().includes(keyword) ||
       r.sales_order?.customer?.name
         ?.toLowerCase()
-        .includes(filter.toLowerCase())
-    );
-  }, [rows, filter]);
+        .includes(keyword);
+
+    // 📅 Date filter
+    const rowDate = r.delivery_date
+      ? new Date(r.delivery_date).setHours(0, 0, 0, 0)
+      : null;
+
+    const fromDate = dateFrom
+      ? new Date(dateFrom).setHours(0, 0, 0, 0)
+      : null;
+
+    const toDate = dateTo
+      ? new Date(dateTo).setHours(23, 59, 59, 999)
+      : null;
+
+    const matchDate =
+      (!fromDate || (rowDate && rowDate >= fromDate)) &&
+      (!toDate || (rowDate && rowDate <= toDate));
+
+    return matchSearch && matchDate;
+  });
+}, [rows, search, dateFrom, dateTo]);
 
   if (loading)
     return <div className="p-6 text-gray-500">Loading invoices...</div>;
@@ -53,22 +79,48 @@ export default function InvoicesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard title="Total Invoice" value={filteredRows.length} />
       </div>
+{/* FILTER */}
+<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+  <input
+    type="text"
+    placeholder="Cari Supplier / No SJ"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-300"
+  />
 
-      {/* FILTER */}
-      <input
-        type="text"
-        placeholder="Filter Customer / Supplier"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300"
-      />
+  <input
+    type="date"
+    value={dateFrom}
+    onChange={(e) => setDateFrom(e.target.value)}
+    className="border rounded-lg px-4 py-2"
+  />
+
+  <input
+    type="date"
+    value={dateTo}
+    onChange={(e) => setDateTo(e.target.value)}
+    className="border rounded-lg px-4 py-2"
+  />
+
+  <button
+    onClick={() => {
+      setSearch("");
+      setDateFrom("");
+      setDateTo("");
+    }}
+    className="bg-gray-200 hover:bg-gray-300 rounded-lg px-4 py-2 text-sm font-medium"
+  >
+    Reset Filter
+  </button>
+</div>
 
       {/* TABLE */}
       <div className="overflow-x-auto bg-white rounded-lg shadow">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {["No", "No SJ", "Customer", "Tanggal", "Action"].map((h) => (
+              {["No", "No SJ", "Supplier", "Tanggal", "Action"].map((h) => (
                 <th key={h} className="p-3 text-left">
                   {h}
                 </th>

@@ -29,7 +29,7 @@ const supabase = createClient(
 
     // 🔹 1. Cek apakah SJ sudah ada untuk SO ini
     const { data: existingDelivery } = await supabase
-      .from("delivery_orders")
+      .from("v_deliveries_active")
       .select("*")
       .eq("sales_order_id", sales_order_id)
       .single();
@@ -44,6 +44,13 @@ const supabase = createClient(
       .select("*")
       .eq("id", sales_order_id)
       .single();
+
+      if (so.status === "cancelled") {
+  return NextResponse.json(
+    { error: "Sales Order sudah cancelled, tidak bisa buat Surat Jalan" },
+    { status: 400 }
+  );
+}
 
     if (soError || !so) {
       console.error("❌ SO Error:", soError);
@@ -73,7 +80,7 @@ const supabase = createClient(
 
     // 🔹 3. Buat delivery_order
     const { data: delivery, error: deliveryError } = await supabase
-      .from("delivery_orders")
+      .from("v_deliveries_active")
       .insert([{
         sales_order_id,
         vehicle_id,
@@ -85,6 +92,7 @@ const supabase = createClient(
         delivery_address: so.delivery_address,
       }])
       .select()
+      
       .single();
 
     if (deliveryError) {
@@ -155,16 +163,18 @@ const supabase = createClient(
     }
 
     // 🔹 6. Update status SO
-    const { error: updateSOError } = await supabase
-      .from("sales_orders")
-      .update({ status: "in_delivery" })
-      .eq("id", sales_order_id);
+    // 🔹 6. Update status SO (JANGAN override cancelled)
+if (so.status === "confirmed" || so.status === "approved") {
+  const { error: updateSOError } = await supabase
+    .from("sales_orders")
+    .update({ status: "in_delivery" })
+    .eq("id", sales_order_id);
 
     if (updateSOError) {
       console.error("❌ Update SO Error:", updateSOError);
       throw updateSOError;
     }
-
+  }
     console.log("✅ SO status updated");
 
     return NextResponse.json({

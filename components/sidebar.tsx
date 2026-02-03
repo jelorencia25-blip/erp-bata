@@ -32,10 +32,10 @@ const menus: MenuItem[] = [
   { label: 'Invoices', href: '/invoices' },
   { label: 'Returns', href: '/returns' },
   { label: 'Payments', href: '/payments' },
+  { label: 'Deposits', href: '/deposits' },
 
   { divider: true },
 
-  { label: 'Purchases', href: '/purchases' },
   { label: 'Drivers & Trips', href: '/driversandtrips' },
   { label: 'Vehicles', href: '/vehicles' },
 

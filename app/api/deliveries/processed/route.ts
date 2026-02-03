@@ -1,27 +1,25 @@
 export const dynamic = 'force-dynamic'
 
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-
-
 export async function GET() {
-
   const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const { data, error } = await supabase
     .from("delivery_orders")
     .select(`
       id,
       sj_number,
-
-      sales_orders (
+      final_status,
+      sales_orders!inner (
         so_number,
         ship_to_name,
         delivery_address,
+        status,
         customers ( name ),
         sales_order_items (
           total_pcs,
@@ -32,7 +30,6 @@ export async function GET() {
           )
         )
       ),
-
       staff:staff!delivery_orders_driver_id_fkey ( name ),
       vehicles ( plate_number )
     `)
@@ -43,44 +40,47 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const result = (data ?? []).map((d: any) => {
-    const so = d.sales_orders;
+  // 🔥 FILTER CANCELLED DI MAPPING
+  const result = (data ?? [])
+    .filter((d: any) => d.sales_orders?.status !== "cancelled")  // 🔥 FILTER
+    .map((d: any) => {
+      const so = d.sales_orders;
 
-    let totalPcs = 0;
-    let totalPalet = 0;
+      let totalPcs = 0;
+      let totalPalet = 0;
+      const ukuranSet = new Set<string>();
+      const kubikSet = new Set<string>();
 
-    const ukuranSet = new Set<string>();
-    const kubikSet = new Set<string>();
+      for (const item of so?.sales_order_items ?? []) {
+        totalPcs += Number(item.total_pcs || 0);
+        totalPalet += Number(item.pallet_qty || 0);
 
-    for (const item of so?.sales_order_items ?? []) {
-      totalPcs += Number(item.total_pcs || 0);
-      totalPalet += Number(item.pallet_qty || 0);
+        if (item.products?.ukuran) {
+          ukuranSet.add(item.products.ukuran);
+        }
 
-      if (item.products?.ukuran) {
-        ukuranSet.add(item.products.ukuran);
+        if (item.products?.kubik_m3 != null) {
+          kubikSet.add(String(item.products.kubik_m3));
+        }
       }
 
-      // ✅ AMBIL APA ADANYA
-      if (item.products?.kubik_m3 != null) {
-        kubikSet.add(String(item.products.kubik_m3));
-      }
-    }
-
-    return {
-      id: d.id,
-      sj_number: d.sj_number,
-      so_number: so?.so_number ?? "-",
-      pelanggan: so?.customers?.name ?? "-",
-      kepada: so?.ship_to_name ?? "-",
-      alamat: so?.delivery_address ?? "-",
-      ukuran: Array.from(ukuranSet).join(", "),
-      total_pcs: totalPcs,
-      palet: totalPalet,
-      kubik_m3: Array.from(kubikSet).join(", "),
-      supir: d.staff?.name ?? "-",
-      plat_mobil: d.vehicles?.plate_number ?? "-",
-    };
-  });
+      return {
+        id: d.id,
+        final_status: d.final_status,
+        sj_number: d.sj_number,
+        so_number: so?.so_number ?? "-",
+        pelanggan: so?.customers?.name ?? "-",
+        kepada: so?.ship_to_name ?? "-",
+        alamat: so?.delivery_address ?? "-",
+        ukuran: Array.from(ukuranSet).join(", "),
+        total_pcs: totalPcs,
+        palet: totalPalet,
+        kubik_m3: Array.from(kubikSet).join(", "),
+        supir: d.staff?.name ?? "-",
+        plat_mobil: d.vehicles?.plate_number ?? "-",
+        so_status: so?.status,  // 🔥 INCLUDE STATUS
+      };
+    });
 
   return NextResponse.json(result);
 }

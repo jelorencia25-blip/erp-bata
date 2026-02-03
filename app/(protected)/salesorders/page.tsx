@@ -19,7 +19,21 @@ type SalesOrder = {
   status: string | null;
 };
 
-const STATUS_OPTIONS = ['pending', 'approved', 'in_delivery', 'completed', 'cancelled'];
+const ROW_STATUS_CLASS: Record<string, string> = {
+  pending:
+    "bg-gray-200 text-gray-900 hover:bg-gray-300",
+
+  in_delivery:
+    "bg-yellow-300 text-yellow-900 hover:bg-yellow-400",
+
+  completed:
+    "bg-green-300 text-green-900 hover:bg-green-400",
+
+  cancelled:
+    "bg-red-300 text-red-900 hover:bg-red-400",
+};
+
+const STATUS_OPTIONS = ['pending', 'in_delivery', 'completed', 'cancelled'];
 
 function StatusBadge({ status }: { status: string | null }) {
   const map: Record<string, string> = {
@@ -319,7 +333,12 @@ export default function SalesOrdersPage() {
               </tr>
             ) : (
               filteredOrders.map((o, index) => (
-                <tr key={o.id} className="border-b hover:bg-gray-50 transition">
+                 <tr
+                  key={o.id}
+                  className={`border-b transition
+                    ${ROW_STATUS_CLASS[o.status ?? ""] ?? "bg-white hover:bg-gray-50"}
+                  `}
+                >
                   {/* 🔥 NOMOR URUT */}
                   <td className="p-3 text-gray-600 font-medium">{index + 1}</td>
                   
