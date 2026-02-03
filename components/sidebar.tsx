@@ -26,7 +26,7 @@ type MenuItem =
 
 const menus: MenuItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
-
+  { label: 'Raw Orders', href: '/raworders' },
   { label: 'Sales Orders', href: '/salesorders' },
   { label: 'Deliveries', href: '/deliveries' },
   { label: 'Invoices', href: '/invoices' },

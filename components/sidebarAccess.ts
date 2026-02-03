@@ -11,6 +11,7 @@ export type UserRole =
 export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
   owner: [
     "Dashboard",
+    "Raw Orders",
     "Sales Orders",
     "Deliveries",
     "Invoices",
@@ -29,6 +30,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
 
   pemilik: [
     "Dashboard",
+    "Raw Orders",
     "Sales Orders",
     "Deliveries",
     "Invoices",
@@ -44,6 +46,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
 
   staff: [
     "Dashboard",
+    "Raw Orders",
     "Sales Orders",
     "Invoices",
     "Returns",
@@ -56,6 +59,8 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
   ],
 
   operator: [
+    "Dashboard",
+    "Raw Orders",
     "Deliveries",
     "Returns",
     "Drivers & Trips",
