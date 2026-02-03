@@ -57,18 +57,24 @@ export default function DeliveriesProcessedPage() {
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.id} className="border-t">
-              <td className="p-2 text-center">
-              {row.final_status === "draft" ? (
-                <button
-                  className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                  onClick={() => setConfirmRow(row)}
-                >
-                  DONE
-                </button>
-              ) : (
-                <span className="text-green-600 font-semibold">FINAL</span>
-              )}
-            </td>
+            <td className="p-2 text-center">
+  {row.final_status === "draft" ? (
+    <div>
+      <button
+        className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          console.log("DONE clicked", row);
+          setConfirmRow(row);
+        }}
+      >
+        DONE
+      </button>
+    </div>
+  ) : (
+    <span className="text-green-600 font-semibold">FINAL</span>
+  )}
+</td>
               <td className="p-2 text-center">{i + 1}</td>
               <td className="p-2">{row.sj_number}</td>
               <td className="p-2">{row.so_number}</td>

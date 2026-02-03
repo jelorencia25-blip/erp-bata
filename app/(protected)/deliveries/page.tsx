@@ -299,6 +299,76 @@ export default function DeliveriesPage() {
           </tbody>
         </table>
       </div>
+{/* MODAL CONFIRMATION */}
+      {confirmRow && (
+        <div 
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          onClick={() => setConfirmRow(null)}
+        >
+          <div 
+            className="bg-white rounded-lg p-6 w-96"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold mb-2 text-red-600">
+              Finalisasi Delivery
+            </h2>
+
+            <p className="text-sm mb-3">
+              Delivery ini akan <b>dikunci</b> dan tidak bisa diubah lagi.
+            </p>
+
+            <ul className="text-sm mb-4 space-y-1">
+              <li><b>SJ:</b> {confirmRow.sj_number}</li>
+              <li><b>SO:</b> {confirmRow.so_number}</li>
+              <li><b>Pelanggan:</b> {confirmRow.pelanggan}</li>
+              <li><b>Total PCS:</b> {confirmRow.total_pcs}</li>
+              <li><b>Palet:</b> {confirmRow.palet}</li>
+            </ul>
+
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-3 py-1 border rounded"
+                disabled={submitting}
+                onClick={() => setConfirmRow(null)}
+              >
+                Batal
+              </button>
+
+              <button
+                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                disabled={submitting}
+                onClick={async () => {
+                  setSubmitting(true);
+
+                  await fetch("/api/deliveries/finalize", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      delivery_order_id: confirmRow.id,
+                    }),
+                  });
+
+                  // Update local state
+                  setData(prev =>
+                    prev.map(r =>
+                      r.id === confirmRow.id
+                        ? { ...r, final_status: "final" }
+                        : r
+                    )
+                  );
+
+                  setSubmitting(false);
+                  setConfirmRow(null);
+                }}
+              >
+                Ya, Finalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
