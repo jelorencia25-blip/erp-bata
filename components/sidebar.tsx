@@ -31,6 +31,10 @@ const menus: MenuItem[] = [
   { label: 'Deliveries', href: '/deliveries' },
   { label: 'Invoices', href: '/invoices' },
   { label: 'Returns', href: '/returns' },
+
+  { divider: true },
+
+  { label: 'Track Payments', href: '/trackpayments' },
   { label: 'Payments', href: '/payments' },
   { label: 'Deposits', href: '/deposits' },
 
