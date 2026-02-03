@@ -79,21 +79,20 @@ const supabase = createClient(
     console.log("✅ SO Items loaded:", soItems?.length);
 
     // 🔹 3. Buat delivery_order
-    const { data: delivery, error: deliveryError } = await supabase
-      .from("v_deliveries_active")
-      .insert([{
-        sales_order_id,
-        vehicle_id,
-        driver_id,
-        status: "in_delivery",
-        customer_id: so.customer_id,
-        contact_name: so.ship_to_name,
-        contact_phone: so.contact_phone,
-        delivery_address: so.delivery_address,
-      }])
-      .select()
-      
-      .single();
+   const { data: delivery, error: deliveryError } = await supabase
+  .from("delivery_orders")   // ✅ table asli
+  .insert([{
+    sales_order_id,
+    vehicle_id,
+    driver_id,
+    status: "in_delivery",
+    customer_id: so.customer_id,
+    contact_name: so.ship_to_name,
+    contact_phone: so.contact_phone,
+    delivery_address: so.delivery_address,
+  }])
+  .select()
+  .single();
 
     if (deliveryError) {
       console.error("❌ Delivery Error:", deliveryError);
