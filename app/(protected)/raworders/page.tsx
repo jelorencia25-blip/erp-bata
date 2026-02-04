@@ -10,6 +10,7 @@ export default function RawOrdersPage() {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">📋 Raw Orders</h1>
           <p className="text-gray-700">
             Silahkan isi orderan yang masuk langsung pada spreadsheet di bawah ini.
+          https://docs.google.com/spreadsheets/d/1kCnIMMsAZIRKoneR9VOAf_TxSDyT1cV5fs_pKvbEEA0/edit?usp=sharing
           </p>
         </div>
 
