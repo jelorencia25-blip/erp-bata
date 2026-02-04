@@ -173,23 +173,23 @@ export default function DeliveriesPage() {
         </div>
       </div>
 
-      {/* OVERVIEW */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded shadow p-4">
-          <p className="text-gray-500 text-sm">Total SJ</p>
-          <p className="text-2xl font-bold">{overview.total}</p>
-        </div>
+     {/* OVERVIEW */}
+<div className="grid grid-cols-3 gap-4 mb-4">
+  <div className="bg-white rounded shadow p-4 border-l-4 border-blue-500">
+    <p className="text-gray-500 text-sm">Total SJ</p>
+    <p className="text-2xl font-bold">{overview.total}</p>
+  </div>
 
-        <div className="bg-yellow-100 rounded shadow p-4">
-          <p className="text-yellow-700 text-sm">Belum Final</p>
-          <p className="text-2xl font-bold">{overview.draft}</p>
-        </div>
+  <div className="bg-yellow-100 rounded shadow p-4 border-l-4 border-yellow-500">
+    <p className="text-yellow-700 text-sm">Belum Final</p>
+    <p className="text-2xl font-bold">{overview.draft}</p>
+  </div>
 
-        <div className="bg-green-100 rounded shadow p-4">
-          <p className="text-green-700 text-sm">Sudah Final</p>
-          <p className="text-2xl font-bold">{overview.final}</p>
-        </div>
-      </div>
+  <div className="bg-green-100 rounded shadow p-4 border-l-4 border-green-500">
+    <p className="text-green-700 text-sm">Sudah Final</p>
+    <p className="text-2xl font-bold">{overview.final}</p>
+  </div>
+</div>
 
       {/* SEARCH */}
       <div className="mb-3">

@@ -20,17 +20,10 @@ type SalesOrder = {
 };
 
 const ROW_STATUS_CLASS: Record<string, string> = {
-  pending:
-    "bg-gray-200 text-gray-900 hover:bg-gray-300",
-
-  in_delivery:
-    "bg-yellow-300 text-yellow-900 hover:bg-yellow-400",
-
-  completed:
-    "bg-green-300 text-green-900 hover:bg-green-400",
-
-  cancelled:
-    "bg-red-300 text-red-900 hover:bg-red-400",
+  cancelled: "bg-red-200 text-red-900 hover:bg-red-300",
+  in_delivery: "bg-yellow-200 text-yellow-900 hover:bg-yellow-300",
+  completed: "bg-green-200 text-green-900 hover:bg-green-300",
+  pending: "bg-gray-200 text-gray-900 hover:bg-gray-300",
 };
 
 const STATUS_OPTIONS = ['pending', 'in_delivery', 'completed', 'cancelled'];
@@ -168,6 +161,7 @@ export default function SalesOrdersPage() {
   const pendingCount = filteredOrders.filter(o => o.status === 'pending').length;
   const inDeliveryCount = filteredOrders.filter(o => o.status === 'in_delivery').length;
   const completedCount = filteredOrders.filter(o => o.status === 'completed').length;
+ const cancelledCount = filteredOrders.filter(o => o.status === 'cancelled').length;
 
   const columns: { key: keyof SalesOrder; label: string; align?: string }[] = [
     { key: 'order_date', label: 'Tgl Order' },
@@ -212,60 +206,56 @@ export default function SalesOrdersPage() {
         </Link>
       </div>
 
-      {/* 🔥 OVERVIEW CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-        {/* Total Orders */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Total SO</p>
-          <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
-        </div>
+      {/* 🔥 OVERVIEW CARDS */}{/* 🔥 OVERVIEW CARDS - 2 ROWS x 4 COL */}
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  {/* Row 1 */}
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Total SO</p>
+    <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
+  </div>
 
-        {/* Total Value */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
-          <p className="text-xl font-bold text-gray-800">
-            Rp {(totalValue / 1000000).toFixed(1)}JT
-          </p>
-        </div>
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
+    <p className="text-xl font-bold text-gray-800">
+      Rp {(totalValue / 1000000).toFixed(1)}JT
+    </p>
+  </div>
 
-        {/* Total PCS */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Total PCS</p>
-          <p className="text-2xl font-bold text-gray-800">{totalPCS.toLocaleString()}</p>
-        </div>
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
+    <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
+    <p className="text-xs text-gray-500">Rp {(francoValue / 1000000).toFixed(1)}JT</p>
+  </div>
 
-        {/* Franco */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
-          <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
-          <p className="text-xs text-gray-500">Rp {(francoValue / 1000000).toFixed(1)}JT</p>
-        </div>
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
+    <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
+    <p className="text-xs text-gray-500">Rp {(loccoValue / 1000000).toFixed(1)}JT</p>
+  </div>
 
-        {/* Locco */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
-          <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
-          <p className="text-xs text-gray-500">Rp {(loccoValue / 1000000).toFixed(1)}JT</p>
-        </div>
+  {/* Row 2 */}
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Pending</p>
+    <p className="text-2xl font-bold text-gray-700">{pendingCount}</p>
+  </div>
 
-        {/* Pending */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Pending</p>
-          <p className="text-2xl font-bold text-gray-700">{pendingCount}</p>
-        </div>
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">In Delivery</p>
+    <p className="text-2xl font-bold text-yellow-700">{inDeliveryCount}</p>
+  </div>
 
-        {/* In Delivery */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
-          <p className="text-xs text-gray-500 uppercase font-semibold">In Delivery</p>
-          <p className="text-2xl font-bold text-yellow-700">{inDeliveryCount}</p>
-        </div>
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Completed</p>
+    <p className="text-2xl font-bold text-green-700">{completedCount}</p>
+  </div>
 
-        {/* Completed */}
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-          <p className="text-xs text-gray-500 uppercase font-semibold">Completed</p>
-          <p className="text-2xl font-bold text-green-700">{completedCount}</p>
-        </div>
-      </div>
+  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
+    <p className="text-xs text-gray-500 uppercase font-semibold">Cancelled</p>
+    <p className="text-2xl font-bold text-red-700">
+      {filteredOrders.filter(o => o.status === 'cancelled').length}
+    </p>
+  </div>
+</div>
 
       {/* FILTERS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -356,10 +346,12 @@ export default function SalesOrdersPage() {
                   </td>
 
                   <td className="p-3">
-                    <select
+                   <select
                       value={o.status ?? ''}
                       onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                      className="px-2 py-1 rounded border focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm"
+                      className={`px-2 py-1 rounded border text-sm font-semibold
+                        ${o.status ? ROW_STATUS_CLASS[o.status] : 'bg-gray-100 text-gray-800'}
+                      `}
                     >
                       {STATUS_OPTIONS.map((s) => (
                         <option key={s} value={s}>

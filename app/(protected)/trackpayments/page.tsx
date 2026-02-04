@@ -114,37 +114,39 @@ export default function TrackPaymentsPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {[
-                "No", "No SJ", "Tgl", "Supplier", "Ref Supplier", "Kepada", "Lewat Hari", "Status"
-              ].map((h) => (
+              {["No", "No SJ", "Tgl", "Supplier", "Ref Supplier", "Kepada", "Lewat Hari", "Status"].map((h) => (
                 <th key={h} className="p-3 text-left">{h}</th>
               ))}
             </tr>
           </thead>
 
-        
           <tbody>
-  {filteredData.length === 0 ? (
-    <tr>
-      <td colSpan={9} className="p-6 text-center text-gray-400">
-        Tidak ada data
-      </td>
-    </tr>
-  ) : (
-    filteredData.map((row, i) => (
-      <tr key={row.delivery_order_id} className="border-b hover:bg-gray-50">
-        <td className="p-3">{i + 1}</td>
-        <td className="p-3 font-medium">{row.no_sj}</td>
-        <td className="p-3">{row.tgl ? new Date(row.tgl).toLocaleDateString("id-ID") : "-"}</td>
-        <td className="p-3">{row.supplier}</td>
-        <td className="p-3">{row.ref_supplier}</td>
-        <td className="p-3">{row.kepada}</td>
-        <td className="p-3 text-center">{row.overdue > 0 ? row.overdue : "-"}</td>
-        <td className="p-3 font-semibold">{row.status.toUpperCase()}</td>
-      </tr>
-    ))
-  )}
-</tbody>
+            {filteredData.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="p-6 text-center text-gray-400">
+                  Tidak ada data
+                </td>
+              </tr>
+            ) : (
+              filteredData.map((row, i) => (
+                <tr
+                  key={row.delivery_order_id}
+                  className={`border-b ${
+                    row.status === "paid" ? "bg-green-200" : "bg-red-200"
+                  } hover:bg-gray-100`}
+                >
+                  <td className="p-3">{i + 1}</td>
+                  <td className="p-3 font-medium">{row.no_sj}</td>
+                  <td className="p-3">{row.tgl ? new Date(row.tgl).toLocaleDateString("id-ID") : "-"}</td>
+                  <td className="p-3">{row.supplier}</td>
+                  <td className="p-3">{row.ref_supplier}</td>
+                  <td className="p-3">{row.kepada}</td>
+                  <td className="p-3 text-center">{row.overdue > 0 ? row.overdue : "-"}</td>
+                  <td className="p-3 font-semibold">{row.status.toUpperCase()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
         </table>
       </div>
     </div>
@@ -168,7 +170,7 @@ function StatCard({
   };
 
   return (
-    <div className={`p-5 rounded-lg shadow ${color ? colorMap[color] : "bg-gray-50"}`}>
+    <div className={`p-5 rounded-lg shadow ${color ? colorMap[color] : "bg-gray-200"}`}>
       <div className="text-sm text-gray-500">{title}</div>
       <div className="text-2xl font-bold">{value}</div>
     </div>

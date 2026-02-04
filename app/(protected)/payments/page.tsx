@@ -38,61 +38,45 @@ export default function PaymentsPage() {
   }, []);
 
   /* ================= UPDATE STATUS ================= */
-  const updateStatus = async (
-    delivery_order_id: string,
-    status: "paid" | "unpaid"
-  ) => {
+  const updateStatus = async (delivery_order_id: string, status: "paid" | "unpaid") => {
     await fetch("/api/payments/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ delivery_order_id, status }),
     });
-
     fetchData();
   };
 
-  /* ================= FILTER DATA (SOURCE OF TRUTH) ================= */
+  /* ================= FILTER DATA ================= */
   const filteredData = useMemo(() => {
-  return data.filter((d) => {
-    // 🔎 search SJ / Supplier
-    const keyword = search.toLowerCase();
-    const matchSearch =
-      !keyword ||
-      d.no_sj.toLowerCase().includes(keyword) ||
-      d.supplier.toLowerCase().includes(keyword);
+    return data.filter((d) => {
+      const keyword = search.toLowerCase();
+      const matchSearch =
+        !keyword ||
+        d.no_sj.toLowerCase().includes(keyword) ||
+        d.supplier.toLowerCase().includes(keyword);
 
-    // 📅 filter tanggal
-    const rowDate = d.tgl ? new Date(d.tgl).setHours(0, 0, 0, 0) : null;
-    const from = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
-    const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
+      const rowDate = d.tgl ? new Date(d.tgl).setHours(0, 0, 0, 0) : null;
+      const from = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
+      const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
 
-    const matchDate =
-      (!from || (rowDate && rowDate >= from)) &&
-      (!to || (rowDate && rowDate <= to));
+      const matchDate =
+        (!from || (rowDate && rowDate >= from)) &&
+        (!to || (rowDate && rowDate <= to));
 
-    return matchSearch && matchDate;
-  });
-}, [data, search, dateFrom, dateTo]);
+      return matchSearch && matchDate;
+    });
+  }, [data, search, dateFrom, dateTo]);
 
-  /* ================= OVERVIEW (BASED ON FILTER) ================= */
+  /* ================= OVERVIEW ================= */
   const overview = useMemo(() => {
     const total = filteredData.length;
-
-    const paid = filteredData.filter(
-      (d) => d.status === "paid"
-    ).length;
-
-    const unpaid = filteredData.filter(
-      (d) => d.status === "unpaid"
-    ).length;
-
-    const overdue = filteredData.filter(
-      (d) => d.status === "unpaid" && d.overdue > 5
-    ).length;
-
+    const paid = filteredData.filter(d => d.status === "paid").length;
+    const unpaid = filteredData.filter(d => d.status === "unpaid").length;
+    const overdue = filteredData.filter(d => d.status === "unpaid" && d.overdue > 5).length;
     const unpaidAmount = filteredData
-      .filter((d) => d.status === "unpaid")
-      .reduce((s, d) => s + (d.total_tagihan ?? 0), 0);
+      .filter(d => d.status === "unpaid")
+      .reduce((sum, d) => sum + (d.total_tagihan ?? 0), 0);
 
     return { total, paid, unpaid, overdue, unpaidAmount };
   }, [filteredData]);
@@ -110,74 +94,46 @@ export default function PaymentsPage() {
         <StatCard title="Total DO" value={overview.total} />
         <StatCard title="DO Dibayar" value={overview.paid} color="green" />
         <StatCard title="DO Belum Dibayar" value={overview.unpaid} color="red" />
-        <StatCard
-          title="Overdue > 5 Hari"
-          value={overview.overdue}
-          color="orange"
-        />
-        <StatCard
-          title="Total Unpaid (Rp)"
-          value={overview.unpaidAmount}
-          color="red"
-          isCurrency
-        />
+        <StatCard title="Overdue > 5 Hari" value={overview.overdue} color="orange" />
+        <StatCard title="Total Unpaid (Rp)" value={overview.unpaidAmount} color="red" isCurrency />
       </div>
 
       {/* FILTER */}
       <div className="flex flex-col md:flex-row gap-2 mb-4">
-  <input
-    type="text"
-    placeholder="Cari No SJ / Nama Supplier"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300"
-  />
-
-  <input
-    type="date"
-    value={dateFrom}
-    onChange={(e) => setDateFrom(e.target.value)}
-    className="border rounded-lg px-4 py-2"
-  />
-
-  <input
-    type="date"
-    value={dateTo}
-    onChange={(e) => setDateTo(e.target.value)}
-    className="border rounded-lg px-4 py-2"
-  />
-
-  <button
-    onClick={() => {
-      setSearch('');
-      setDateFrom('');
-      setDateTo('');
-    }}
-    className="bg-gray-200 hover:bg-gray-300 rounded px-4 py-2"
-  >
-    Reset Filter
-  </button>
-</div>
+        <input
+          type="text"
+          placeholder="Cari No SJ / Nama Supplier"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300"
+        />
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="border rounded-lg px-4 py-2"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="border rounded-lg px-4 py-2"
+        />
+        <button
+          onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+          className="bg-gray-200 hover:bg-gray-300 rounded px-4 py-2"
+        >
+          Reset Filter
+        </button>
+      </div>
 
       {/* TABLE */}
       <div className="overflow-x-auto bg-white rounded-lg shadow">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {[
-                "No",
-                "No SJ",
-                "Tgl",
-                "Supplier",
-                "Ref Supplier",
-                "Kepada",
-                "Total Tagihan",
-                "Overdue",
-                "Status",
-              ].map((h) => (
-                <th key={h} className="p-3 text-left">
-                  {h}
-                </th>
+              {["No","No SJ","Tgl","Supplier","Ref Supplier","Kepada","Total Tagihan","Overdue","Status"].map((h) => (
+                <th key={h} className="p-3 text-left">{h}</th>
               ))}
             </tr>
           </thead>
@@ -193,24 +149,22 @@ export default function PaymentsPage() {
               filteredData.map((row, i) => (
                 <tr
                   key={row.delivery_order_id}
-                  className="border-b hover:bg-gray-50"
+                  className={`border-b ${
+                    row.status === "paid"
+                      ? "bg-green-200 text-green-900"
+                      : "bg-red-200 text-red-900"
+                  } hover:${row.status === "paid" ? "bg-green-300" : "bg-red-300"} transition-colors duration-150`}
                 >
                   <td className="p-3">{i + 1}</td>
                   <td className="p-3 font-medium">{row.no_sj}</td>
-                  <td className="p-3">
-                    {row.tgl
-                      ? new Date(row.tgl).toLocaleDateString("id-ID")
-                      : "-"}
-                  </td>
+                  <td className="p-3">{row.tgl ? new Date(row.tgl).toLocaleDateString("id-ID") : "-"}</td>
                   <td className="p-3">{row.supplier}</td>
                   <td className="p-3">{row.ref_supplier}</td>
                   <td className="p-3">{row.kepada}</td>
                   <td className="p-3 text-right font-semibold">
                     Rp {row.total_tagihan.toLocaleString("id-ID")}
                   </td>
-                  <td className="p-3 text-center">
-                    {row.overdue > 0 ? row.overdue : "-"}
-                  </td>
+                  <td className="p-3 text-center">{row.overdue > 0 ? row.overdue : "-"}</td>
                   <td className="p-3">
                     <select
                       value={row.status}
@@ -221,10 +175,9 @@ export default function PaymentsPage() {
                         )
                       }
                       className={`px-3 py-1 rounded-full text-xs font-semibold
-                        ${
-                          row.status === "paid"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                        ${row.status === "paid"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
                         }`}
                     >
                       <option value="unpaid">UNPAID</option>
