@@ -3,6 +3,45 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// =============================================
+// GET - LIST ALL SALES ORDERS
+// =============================================
+export async function GET() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    const { data, error } = await supabase
+      .from("sales_orders")
+      .select(`
+        *,
+        customers(id, name),
+        deposits(deposit_code)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Transform untuk flatten nested objects
+    const transformed = data.map((so: any) => ({
+      ...so,
+      customer_name: so.customers?.[0]?.name || '-',
+      deposit_code: so.deposits?.[0]?.deposit_code || '-',
+    }));
+
+    return NextResponse.json(transformed);
+
+  } catch (err: any) {
+    console.error("GET SALES ORDERS ERROR:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// =============================================
+// POST - CREATE SALES ORDER
+// =============================================
 export async function POST(req: Request) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,8 +50,6 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-
-    console.log("ITEMS FROM FRONTEND:", JSON.stringify(body.items, null, 2));
 
     if (!body.customer_id) {
       return NextResponse.json(
@@ -28,13 +65,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔥 LOG DEPOSIT DATA
-    console.log("DEPOSIT DATA:", {
-      deposit_id: body.deposit_id,
-      do_used: body.deposit_do_used,
-      amount_used: body.deposit_amount_used,
-    });
-
     const { data, error } = await supabase.rpc("rpc_create_sales_order", {
       p_customer_id: body.customer_id,
       p_customer_order_ref: body.customer_order_ref ?? null,
@@ -44,7 +74,6 @@ export async function POST(req: Request) {
       p_purchase_type: body.purchase_type ?? "Franco",
       p_notes: body.notes ?? null,
       p_items: body.items,
-      // 🔥 DEPOSIT (OPTIONAL)
       p_deposit_id: body.deposit_id ?? null,
       p_deposit_do_used: body.deposit_do_used ?? 0,
       p_deposit_amount_used: body.deposit_amount_used ?? 0,
@@ -55,13 +84,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    console.log("RPC SUCCESS:", data);
-
-    // 🔥 DATA SEKARANG ARRAY, AMBIL FIRST ITEM
     return NextResponse.json({ 
-      id: data[0].id,
-      so_number: data[0].so_number 
+      id: data,
+      message: "Sales Order created successfully"
     });
+
   } catch (err: any) {
     console.error("CATCH ERROR:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

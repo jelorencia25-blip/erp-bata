@@ -189,7 +189,7 @@ export default function StaffsManagementPage() {
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Address</th>
               <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">Salary</th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Status</th>
-              <th className="px-4 py-2 text-center text-sm font-medium text-gray-700">Actions</th>
+              {/* <th className="px-4 py-2 text-center text-sm font-medium text-gray-700">Actions</th> */}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -211,12 +211,12 @@ export default function StaffsManagementPage() {
                   >
                     Edit
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => handleDelete(s.id)}
                     className="bg-red-600 text-white px-4 py-1.5 rounded hover:bg-red-700 transition"
                   >
                     Delete
-                  </button>
+                  </button> */}
                 </td>
               </tr>
             ))}

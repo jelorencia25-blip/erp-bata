@@ -20,6 +20,8 @@ type Row = {
 export default function DriverTripsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [driverFilter, setDriverFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
 
@@ -99,21 +101,39 @@ export default function DriverTripsPage() {
 
   // Filtered rows
   const filteredRows = useMemo(() => {
-    return driverFilter
-      ? rows.filter((r) =>
-          r.driver.toLowerCase().includes(driverFilter.toLowerCase())
-        )
-      : rows;
-  }, [rows, driverFilter]);
+    return rows.filter((r) => {
+      // Filter by driver
+      if (driverFilter && !r.driver.toLowerCase().includes(driverFilter.toLowerCase())) {
+        return false;
+      }
+
+      // Filter by date range
+      const rowDate = new Date(r.tanggal);
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (rowDate < fromDate) return false;
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        if (rowDate > toDate) return false;
+      }
+
+      return true;
+    });
+  }, [rows, driverFilter, dateFrom, dateTo]);
 
   // Summary
   const overview = useMemo(() => {
+    const totalUangJalan = filteredRows.reduce((s, r) => s + r.uang_jalan, 0);
+    const totalTambahan = filteredRows.reduce((s, r) => s + r.tambahan, 0);
     const total = filteredRows.reduce((s, r) => s + r.total, 0);
     const paid = filteredRows
       .filter((r) => r.bayar === "paid")
       .reduce((s, r) => s + r.total, 0);
     const unpaid = total - paid;
-    return { total, paid, unpaid };
+    return { totalUangJalan, totalTambahan, total, paid, unpaid };
   }, [filteredRows]);
 
   const drivers = useMemo(
@@ -191,62 +211,115 @@ export default function DriverTripsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-      {/* Header */}
-<div className="bg-white rounded-lg shadow-sm p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-  {/* Judul */}
-  <h1 className="text-3xl font-bold text-gray-800">
-    🚚 Driver & Trips Management
-  </h1>
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {/* Judul */}
+          <h1 className="text-3xl font-bold text-gray-800">
+            🚚 Driver & Trips Management
+          </h1>
 
-  {/* Export Button */}
-  <button
-    onClick={exportToExcel}
-    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-  >
-    Download Excel
-  </button>
-</div>
+          {/* Export Button */}
+          <button
+            onClick={exportToExcel}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+          >
+            Download Excel
+          </button>
+        </div>
 
-{/* Filter & Summary Cards */}
-<div className="flex flex-col md:flex-row justify-between gap-4 mt-4">
-  {/* Filter Driver */}
-  <div className="flex items-center gap-3">
-    <label className="text-sm font-medium text-gray-700">Filter Driver:</label>
-    <select
-      className="border border-gray-300 rounded-lg px-3 py-2 min-w-37,5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-      value={driverFilter}
-      onChange={(e) => setDriverFilter(e.target.value)}
-    >
-      <option value="">Semua Driver</option>
-      {drivers.map((d) => (
-        <option key={d} value={d}>{d}</option>
-      ))}
-    </select>
-  </div>
+        {/* Filter Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
+            {/* Filter Driver */}
+            <div className="flex flex-col gap-2 w-full lg:w-auto">
+              <label className="text-sm font-medium text-gray-700">Filter Driver:</label>
+              <select
+                className="border border-gray-300 rounded-lg px-3 py-2 min-w-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={driverFilter}
+                onChange={(e) => setDriverFilter(e.target.value)}
+              >
+                <option value="">Semua Driver</option>
+                {drivers.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
 
-  {/* Summary Cards */}
-  <div className="flex flex-wrap gap-4">
-    <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-      <div className="text-xs text-blue-600 font-medium">Total</div>
-      <div className="text-lg font-bold text-blue-700">
-        Rp {overview.total.toLocaleString("id-ID")}
-      </div>
-    </div>
-    <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-      <div className="text-xs text-green-600 font-medium">Paid</div>
-      <div className="text-lg font-bold text-green-700">
-        Rp {overview.paid.toLocaleString("id-ID")}
-      </div>
-    </div>
-    <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-      <div className="text-xs text-red-600 font-medium">Unpaid</div>
-      <div className="text-lg font-bold text-red-700">
-        Rp {overview.unpaid.toLocaleString("id-ID")}
-      </div>
-    </div>
-  </div>
-</div>
+            {/* Date From */}
+            <div className="flex flex-col gap-2 w-full lg:w-auto">
+              <label className="text-sm font-medium text-gray-700">Dari Tanggal:</label>
+              <input
+                type="date"
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
 
+            {/* Date To */}
+            <div className="flex flex-col gap-2 w-full lg:w-auto">
+              <label className="text-sm font-medium text-gray-700">Sampai Tanggal:</label>
+              <input
+                type="date"
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+
+            {/* Reset Button */}
+            {(driverFilter || dateFrom || dateTo) && (
+              <button
+                onClick={() => {
+                  setDriverFilter("");
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-purple-600 font-medium">Total Uang Jalan</div>
+            <div className="text-lg font-bold text-purple-700">
+              Rp {overview.totalUangJalan.toLocaleString("id-ID")}
+            </div>
+          </div>
+          
+          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-orange-600 font-medium">Total Tambahan</div>
+            <div className="text-lg font-bold text-orange-700">
+              Rp {overview.totalTambahan.toLocaleString("id-ID")}
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-blue-600 font-medium">Total Keseluruhan</div>
+            <div className="text-lg font-bold text-blue-700">
+              Rp {overview.total.toLocaleString("id-ID")}
+            </div>
+          </div>
+          
+          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-green-600 font-medium">Paid</div>
+            <div className="text-lg font-bold text-green-700">
+              Rp {overview.paid.toLocaleString("id-ID")}
+            </div>
+          </div>
+          
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-red-600 font-medium">Unpaid</div>
+            <div className="text-lg font-bold text-red-700">
+              Rp {overview.unpaid.toLocaleString("id-ID")}
+            </div>
+          </div>
+        </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-x-auto">

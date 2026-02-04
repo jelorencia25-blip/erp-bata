@@ -217,7 +217,7 @@ export default function DeliveryProcessedDetailPage() {
               <span className="flex-1">{data.order_date}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">No Ref Supplier</span>
+              <span className="font-semibold w-36">No Ref</span>
               <span className="flex-1">{data.customer_order_ref}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
@@ -239,84 +239,69 @@ export default function DeliveryProcessedDetailPage() {
         </div>
 
         <div className="mb-3">
-          <table className="w-full border-collapse border border-gray-300">
-            <thead className="bg-gray-800 text-white">
-              <tr>
-                <th className="border border-gray-300 px-2 py-1 text-center">No</th>
-                <th className="border border-gray-300 px-3 py-1 text-left">Barang / Ukuran</th>
-                <th className="border border-gray-300 px-2 py-1 text-center">Isi/Palet</th>
-                <th className="border border-gray-300 px-2 py-1 text-center">Palet</th>
-                <th className="border border-gray-300 px-2 py-1 text-center">PCS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.delivery_items.map((item, idx) => (
-                <tr key={item.id}>
-                  <td className="border border-gray-300 px-2 py-1 text-center">
-                    {idx + 1}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-1">
-                    {item.product_name || "-"} 
-                    {item.product_size && item.product_size !== "-" ? ` (${item.product_size})` : ""}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1 text-center">
-                    {item.isi_per_palet > 0 ? item.isi_per_palet : "-"}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1 text-center">
-                    {item.pallet_qty}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1 text-center">
-                    {item.total_pcs}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+         <table className="w-full border-collapse sj-table">
+  <thead>
+    <tr>
+      <th className="text-center w-8">No</th>
+      <th className="text-left">Barang / Ukuran</th>
+      <th className="text-center w-20">Isi / Palet</th>
+      <th className="text-center w-16">Palet</th>
+      <th className="text-center w-20">PCS</th>
+    </tr>
+  </thead>
+  <tbody>
+    {data.delivery_items.map((item, idx) => (
+      <tr key={item.id}>
+        <td className="text-center">{idx + 1}</td>
+        <td>
+          {item.product_name}
+          {item.product_size ? ` (${item.product_size})` : ""}
+        </td>
+        <td className="text-center">
+          {item.isi_per_palet || "-"}
+        </td>
+        <td className="text-center">{item.pallet_qty}</td>
+        <td className="text-center">{item.total_pcs}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
         </div>
 
         <div className="mb-3">
          
-          <table className="w-full border-collapse border border-gray-300">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border px-3 py-1 text-left">Retur Barang</th>
-                <th className="border px-2 py-1 text-center w-24">PCS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.delivery_items.map((item) => (
-                <tr key={item.id}>
-                  <td className="border px-3 py-1">
-                    {item.product_name || "-"}
-                    {item.product_size && item.product_size !== "-" ? ` (${item.product_size})` : ""}
-                  </td>
-                  <td className="border px-2 py-1 text-center">
-                    <span className="print:hidden">
-                      <input
-                        type="number"
-                        min={0}
-                        max={item.total_pcs}
-                        value={returns[item.id]?.qty || 0}
-                        onChange={(e) =>
-                          setReturns({
-                            ...returns,
-                            [item.id]: {
-                              qty: Number(e.target.value) || 0,
-                              reason: returns[item.id]?.reason || "",
-                            },
-                          })
-                        }
-                        className="w-20 px-2 py-1 border rounded text-center"
-                      />
-                    </span>
-                    <span className="hidden print:inline">
-                      {returns[item.id]?.qty || 0}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <table className="w-full border-collapse sj-table mt-2">
+  <thead>
+    <tr>
+      <th className="text-left">Retur Barang</th>
+      <th className="text-center w-20">PCS</th>
+    </tr>
+  </thead>
+  <tbody>
+    {data.delivery_items.map((item) => (
+      <tr key={item.id}>
+        <td>
+          {item.product_name}
+          {item.product_size ? ` (${item.product_size})` : ""}
+        </td>
+        <td className="text-center">
+          <span className="print:hidden">
+            <input
+              type="number"
+              value={returns[item.id]?.qty || 0}
+              className="w-16 border text-center"
+            />
+          </span>
+          <span className="hidden print:inline">
+            {returns[item.id]?.qty || 0}
+          </span>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-4">
@@ -363,210 +348,137 @@ export default function DeliveryProcessedDetailPage() {
           <div className="text-center">
             <p className="font-semibold mb-7">Tanda Terima</p>
            
-              <p className="text-sm">(.....................)</p>
+              {/* <p className="text-sm">(................)</p> */}
           
           </div>
           
           <div className="text-center">
             <p className="font-semibold mb-7">Supir</p>
            
-              <p className="text-sm">
-                ({drivers.find(d => d.id === driverId)?.name || "....................."})
-              </p>
+              {/* <p className="text-sm">
+                ({drivers.find(d => d.id === driverId)?.name || "................"})
+              </p> */}
             
           </div>
           
           <div className="text-center">
             <p className="font-semibold mb-7">Dibuat Oleh</p>
             
-              <p className="text-sm">(.....................)</p>
+              {/* <p className="text-sm">(................)</p> */}
             
           </div>
           
           <div className="text-center">
             <p className="font-semibold mb-7">Security</p>
           
-              <p className="text-sm">(.....................)</p>
+              {/* <p className="text-sm">(................)</p> */}
            
           </div>
         </div>
       </div>
 
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 0.4in 0.3in;
-          }
-          
-          body * {
-            visibility: hidden;
-          }
-          
-          #print-content,
-          #print-content * {
-            visibility: visible;
-          }
-          
-          #print-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 0 !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            max-height: 5.5in;
-          }
-          
-          /* Font sizes untuk 3-ply yang lebih besar */
-          #print-content {
-            font-size: 13pt !important;
-            line-height: 1.15 !important;
-          }
-          
-          #print-content h1 {
-            font-size: 18pt !important;
-            font-weight: bold !important;
-            margin-bottom: 4pt !important;
-            padding-bottom: 4pt !important;
-          }
-          
-          #print-content h3 {
-            font-size: 14pt !important;
-            font-weight: bold !important;
-            padding: 3pt 6pt !important;
-            margin-bottom: 3pt !important;
-          }
-          
-          /* Kompres spacing antar section */
-          #print-content .grid {
-            gap: 2pt !important;
-          }
-          
-          #print-content .mb-3,
-          #print-content .mb-4 {
-            margin-bottom: 4pt !important;
-          }
-          
-          #print-content .pb-3 {
-            padding-bottom: 3pt !important;
-          }
-          
-          #print-content .py-1 {
-            padding-top: 2pt !important;
-            padding-bottom: 2pt !important;
-          }
-          
-          #print-content .gap-x-8 {
-            column-gap: 12pt !important;
-          }
-          
-          #print-content .gap-y-1 {
-            row-gap: 1pt !important;
-          }
-          
-          /* Table styling untuk keterbacaan */
-          #print-content table {
-            font-size: 12pt !important;
-            border-collapse: collapse !important;
-            border: 2pt solid #000 !important;
-            line-height: 1.1 !important;
-          }
-          
-          #print-content thead {
-            background-color: #000 !important;
-            color: #fff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          
-          #print-content th {
-            font-size: 13pt !important;
-            font-weight: bold !important;
-            padding: 3pt 4pt !important;
-            border: 2pt solid #000 !important;
-            line-height: 1.1 !important;
-          }
-          
-          #print-content td {
-            padding: 2pt 4pt !important;
-            border: 1pt solid #000 !important;
-            line-height: 1.1 !important;
-          }
-          
-          /* Label dan value */
-          #print-content .font-semibold {
-            font-weight: bold !important;
-            font-size: 13pt !important;
-          }
-          
-          /* Border untuk data rows */
-          #print-content .border-b {
-            border-bottom: 1pt solid #333 !important;
-          }
-          
-          #print-content .border-t-2 {
-            border-top: 2pt solid #000 !important;
-          }
-          
-          /* Signature section - kompres vertical space */
-          #print-content .mt-6 {
-            margin-top: 6pt !important;
-          }
-          
-          #print-content .pt-4 {
-            padding-top: 4pt !important;
-          }
-          
-          #print-content .mb-10 {
-            margin-bottom: 16pt !important;
-          }
-          
-          #print-content .mb-1 {
-            margin-bottom: 1pt !important;
-          }
-          
-          #print-content .mb-2 {
-            margin-bottom: 2pt !important;
-          }
-          
-          #print-content .gap-4 {
-            gap: 8pt !important;
-          }
-          
-          #print-content .gap-6 {
-            gap: 12pt !important;
-          }
-          
-          #print-content .text-sm {
-            font-size: 11pt !important;
-          }
-          
-          #print-content .text-base {
-            font-size: 13pt !important;
-          }
-          
-          /* Utility classes */
-          .print\\:hidden {
-            display: none !important;
-          }
-          
-          .print\\:block {
-            display: block !important;
-          }
-          
-          .print\\:inline {
-            display: inline !important;
-          }
-          
-          /* Pastikan background color tercetak */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `}</style>
+<style jsx global>{`
+  @media print {
+
+    /* ================= PAGE ================= */
+    @page {
+      size: A4 portrait;
+      margin: 6mm 6mm;
+    }
+
+    body {
+      font-family: "Courier New", Courier, monospace !important;
+      font-weight: 600 !important;
+      color: #000 !important;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    #print-content,
+    #print-content * {
+      visibility: visible;
+    }
+
+    #print-content {
+      position: absolute;
+      inset: 0;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      font-size: 12pt !important;
+      line-height: 1.1 !important;
+    }
+
+    /* ================= HEADER ================= */
+    #print-content h1 {
+      font-size: 16pt !important;
+      margin: 0 0 4pt 0 !important;
+      padding-bottom: 4pt !important;
+      border-bottom: 1pt solid #000 !important;
+    }
+
+    #print-content .font-semibold {
+      font-weight: 700 !important;
+      font-size: 12pt !important;
+    }
+
+    #print-content .border-b {
+      border-bottom: 0.8pt solid #000 !important;
+    }
+
+    /* ================= TABLE ================= */
+    .sj-table {
+      width: 100%;
+      border-collapse: collapse !important;
+      border: 1pt solid #000 !important;
+      font-size: 11.5pt !important;
+    }
+
+    .sj-table th,
+    .sj-table td {
+      border: 0.8pt solid #000 !important;
+      padding: 2pt 4pt !important;
+      vertical-align: middle !important;
+    }
+
+    .sj-table th {
+      font-weight: 700 !important;
+      text-align: center;
+    }
+
+    .sj-table thead {
+      background: none !important;
+    }
+
+    /* ================= PRINT UTILS ================= */
+    .print\\:hidden {
+      display: none !important;
+    }
+
+    .print\\:inline {
+      display: inline !important;
+    }
+
+    .print\\:block {
+      display: block !important;
+    }
+
+    /* ================= SIGNATURE ================= */
+    #print-content .grid-cols-4 {
+      margin-top: 10pt !important;
+    }
+
+    #print-content .grid-cols-4 p {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+  }
+`}</style>
+
+
     </div>
   );
 }

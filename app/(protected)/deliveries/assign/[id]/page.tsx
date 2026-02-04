@@ -115,12 +115,12 @@ export default function AssignDeliveryPage() {
           ← Kembali
         </button>
         <div className="flex gap-3">
-          <button
+          {/* <button
             onClick={() => window.print()}
             className="bg-blue-600 text-white px-4 py-2 rounded"
           >
             Print
-          </button>
+          </button> */}
           <button
             onClick={handleSave}
             disabled={saving}

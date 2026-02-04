@@ -112,7 +112,7 @@ useEffect(() => {
               <th className="th">m3 / Palet</th>
               <th className="th">Isi / Palet</th>
               <th className="th">Palet</th>
-              <th className="th text-center">Aksi</th>
+              {/* <th className="th text-center">Aksi</th> */}
             </tr>
           </thead>
           <tbody>
@@ -123,14 +123,14 @@ useEffect(() => {
                 <td className="td">{p.kubik_m3}</td>
                 <td className="td">{p.isi_per_palet}</td>
                 <td className="td">{p.jumlah_palet}</td>
-                <td className="td text-center">
+                {/* <td className="td text-center">
                   <button
                     onClick={() => handleDelete(p.id)}
                     className="btn-red"
                   >
                     Delete
                   </button>
-                </td>
+                </td> */}
               </tr>
             ))}
           </tbody>

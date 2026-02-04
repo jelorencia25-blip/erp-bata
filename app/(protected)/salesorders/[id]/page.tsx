@@ -10,21 +10,14 @@ export default function SalesOrderDetailPage() {
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-useEffect(() => {
+  useEffect(() => {
   if (!id) return;
 
   fetch(`/api/salesorders/${id}`)
     .then((res) => res.json())
     .then((json) => {
       console.log("RAW API RESPONSE:", json);
-      console.log("DEPOSIT USAGES:", json.deposit_usages);
-
-      // 🔥 FIX: deposit_usages bisa object atau array
-      const depositUsage = Array.isArray(json.deposit_usages)
-        ? json.deposit_usages[0]
-        : json.deposit_usages;
-
-      console.log("DEPOSIT USAGE:", depositUsage);
+      console.log("DEPOSIT INFO:", json.deposit);
 
       setData({
         no_so: json.so_number ?? "-",
@@ -37,14 +30,14 @@ useEffect(() => {
         purchase_type: json.purchase_type ?? "-",
         notes: json.notes ?? "-",
 
-        // ✅ DEPOSIT DATA
-        deposit: depositUsage
+        // ✅ FIXED: Akses deposit langsung (flat structure)
+        deposit: json.deposit
           ? {
-              deposit_code: depositUsage.deposits?.deposit_code ?? "-",
-              do_used: depositUsage.do_count ?? 0,
-              amount_used: depositUsage.amount_used ?? 0,
-              do_remaining: depositUsage.deposits?.do_remaining ?? 0,
-              deposit_amount: depositUsage.deposits?.deposit_amount ?? 0,
+              deposit_code: json.deposit.deposit_code ?? "-",
+              do_remaining: json.deposit.do_remaining ?? 0,
+              deposit_amount: json.deposit.deposit_amount ?? 0,
+              amount_remaining: json.deposit.amount_remaining ?? 0,
+              price_lock_per_m3: json.deposit.price_lock_per_m3 ?? 0,
             }
           : null,
 

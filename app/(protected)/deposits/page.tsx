@@ -41,6 +41,8 @@ type DepositDetail = {
     do_count: number;
     amount_used: number;
     created_at: string;
+    sj_number: string;              // 🔥 TAMBAH INI
+    delivery_date: string;  
     sales_order: {
       id: string;
       so_number: string;
@@ -74,6 +76,8 @@ export default function DepositsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -220,6 +224,8 @@ export default function DepositsPage() {
     }
   };
 
+
+  
   // Filter deposits
   const filteredDeposits = deposits.filter((d) => {
     const matchCustomer = filters.customer
@@ -607,6 +613,8 @@ export default function DepositsPage() {
                     <tr>
                       <th className="p-2 text-left text-sm">SO Number</th>
                       <th className="p-2 text-left text-sm">Order Date</th>
+                    <th className="p-2 text-left text-sm">SJ Number</th>
+                    <th className="p-2 text-left text-sm">Delivery Date</th>
                       <th className="p-2 text-left text-sm">Ship To</th>
                       <th className="p-2 text-right text-sm">DO Count</th>
                       <th className="p-2 text-right text-sm">Amount Used</th>
@@ -621,6 +629,12 @@ export default function DepositsPage() {
                         </td>
                         <td className="p-2 text-sm">
                           {new Date(u.sales_order.order_date).toLocaleDateString('id-ID')}
+                        </td>
+                        <td className="p-2 text-sm font-semibold text-blue-600">
+                          {u.sj_number}
+                        </td>
+                        <td className="p-2 text-sm">
+                          {new Date(u.delivery_date).toLocaleDateString('id-ID')}
                         </td>
                         <td className="p-2 text-sm">{u.sales_order.ship_to_name}</td>
                         <td className="p-2 text-right text-sm">{u.do_count}</td>

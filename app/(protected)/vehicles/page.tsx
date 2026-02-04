@@ -218,7 +218,7 @@ export default function VehiclesPage() {
               <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Type</th>
               <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Max Pallet</th>
               <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
-              <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Actions</th>
+              {/* <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Actions</th> */}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -273,7 +273,7 @@ export default function VehiclesPage() {
                   </select>
                 </td>
 
-                <td className="px-4 py-2">
+                {/* <td className="px-4 py-2">
                   <button
                     className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:opacity-50"
                     onClick={() => handleDelete(v.id)}
@@ -281,7 +281,7 @@ export default function VehiclesPage() {
                   >
                     {actionLoading[v.id] ? "..." : "Delete"}
                   </button>
-                </td>
+                </td> */}
               </tr>
             ))}
 

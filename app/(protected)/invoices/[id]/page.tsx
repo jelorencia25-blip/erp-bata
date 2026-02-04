@@ -379,187 +379,151 @@ export default function InvoiceDetailPage() {
 
       {/* PRINT STYLES */}
       <style jsx global>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 0.5in 0.4in;
-          }
+@media print {
 
-          body * {
-            visibility: hidden;
-          }
+  /* ================= PAGE ================= */
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm 18mm 12mm; /* bawah lebih lega */
+  }
 
-          #print-content,
-          #print-content * {
-            visibility: visible;
-          }
+  body {
+    font-family: "Courier New", Courier, monospace !important;
+    color: #000 !important;
+  }
 
-          #print-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 8pt 12pt !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            max-height: 5.5in;
-          }
+  body * {
+    visibility: hidden;
+  }
 
-          /* Font sizes untuk 3-ply */
-          #print-content {
-            font-size: 13pt !important;
-            line-height: 1.15 !important;
-          }
+  #print-content,
+  #print-content * {
+    visibility: visible;
+  }
 
-          /* Title */
-          #print-content .text-2xl {
-            font-size: 18pt !important;
-            margin-bottom: 6pt !important;
-          }
+  #print-content {
+    position: absolute;
+    inset: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: 1.5pt solid #000 !important;
+    font-size: 12pt !important;
+    line-height: 1.2 !important;
+  }
 
-          /* Header info */
-          #print-content .font-bold {
-            font-weight: bold !important;
-          }
+  /* ================= TITLE ================= */
+  #print-content .text-2xl {
+    font-size: 16pt !important;
+    font-weight: 700 !important;
+    margin-bottom: 6pt !important;
+  }
 
-          /* Kompres spacing */
-          #print-content .mb-3 {
-            margin-bottom: 6pt !important;
-          }
+  /* ================= HEADER ================= */
+  #print-content .border-b-2 {
+    border-bottom: 1.2pt solid #000 !important;
+  }
 
-          #print-content .pb-2 {
-            padding-bottom: 4pt !important;
-          }
+  #print-content .font-bold {
+    font-weight: 700 !important;
+  }
 
-          #print-content .space-y-1 > * + * {
-            margin-top: 2pt !important;
-          }
+  /* ================= TABLE ================= */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 11.5pt !important;
+  }
 
-          #print-content .gap-4 {
-            gap: 8pt !important;
-          }
+  th,
+  td {
+    border: 1pt solid #000 !important;
+    padding: 3pt 4pt !important;
+    vertical-align: middle !important;
+  }
 
-          #print-content .gap-8 {
-            gap: 16pt !important;
-          }
+  th {
+    text-align: center !important;
+    font-weight: 700 !important;
+    background: none !important; /* ❌ NO HITAM */
+  }
 
-          /* Table styling */
-          #print-content table {
-            font-size: 12pt !important;
-            border: 2pt solid #000 !important;
-          }
+  thead {
+    background: none !important;
+  }
 
-          #print-content thead {
-            background-color: #000 !important;
-            color: #fff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
+  /* ================= TERBILANG ================= */
+  /* PENTING: JANGAN BOLD */
+  #print-content .italic {
+    font-style: italic !important;
+    font-weight: 400 !important;
+    font-size: 12pt !important;
+  }
 
-          #print-content th {
-            font-size: 13pt !important;
-            font-weight: bold !important;
-            padding: 3pt 4pt !important;
-            border: 2pt solid #000 !important;
-          }
+  #print-content .italic .font-bold {
+    font-weight: 400 !important;
+  }
 
-          #print-content td {
-            padding: 2pt 4pt !important;
-            border: 1pt solid #000 !important;
-          }
+  /* ================= TOTAL ================= */
+  #print-content .border-2.border-black {
+    border: 1.5pt solid #000 !important;
+    background: none !important; /* ❌ NO ABU */
+  }
 
-          /* REKENING TRANSFER - Isi gede, label kecil, bisa wrap */
-          #print-content .border-2.border-black.p-2 {
-            border: 2pt solid #000 !important;
-            padding: 4pt !important;
-            background-color: #f0f0f0 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
+    /* ================= REKENING TRANSFER ================= */
+  #print-content .border-2.border-black.p-2 {
+    font-size: 10pt !important;     /* 🔥 GEDE BANGET */
+    font-weight: 1000 !important;
+    line-height: 1 !important;
 
-          #print-content .border-2.border-black.p-2 .text-sm.mb-1 {
-            font-size: 12pt !important;
-            margin-bottom: 2pt !important;
-          }
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
 
-          #print-content .border-2.border-black.p-2 select,
-          #print-content .border-2.border-black.p-2 .text-sm.font-bold {
-            font-size: 14pt !important;
-            font-weight: bold !important;
-            line-height: 1.4 !important;
-            word-wrap: break-word !important;
-            white-space: normal !important;
-            overflow-wrap: break-word !important;
-          }
+    padding: 8pt 10pt !important;
+    margin-top: 6pt !important;
 
-          /* Terbilang lebih besar */
-          #print-content .text-base.italic {
-            font-size: 13pt !important;
-            line-height: 1.3 !important;
-          }
+    page-break-inside: avoid !important;
+  }
 
-          /* Total tagihan balance */
-          #print-content .text-base.font-bold {
-            font-size: 14pt !important;
-          }
+  /* kalau ada teks kecil di dalamnya (misal span / p) */
+  #print-content .border-2.border-black.p-2 * {
+    font-size: inherit !important;
+    font-weight: inherit !important;
+  }
 
-          #print-content .bg-gray-100 {
-            background-color: #e5e5e5 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
 
-          /* Signature spacing */
-          #print-content .mt-12 {
-            margin-top: 20pt !important;
-          }
+  /* ================= SIGNATURE ================= */
+  .signature-box {
+    min-height: 70pt !important;
+    padding-top: 10pt !important;
+    text-align: center !important;
+  }
 
-          #print-content .mt-auto {
-            margin-top: auto !important;
-          }
+  .signature-line {
+    display: inline-block !important;
+    min-width: 160pt !important;
+    border-top: 1pt solid #000 !important;
+    padding-top: 2pt !important;
+    font-size: 8pt !important;
+  }
 
-          #print-content .pt-8 {
-            padding-top: 12pt !important;
-          }
+  /* ================= FORM ELEMENT ================= */
+  select,
+  input {
+    border: none !important;
+    padding: 0 !important;
+    appearance: none !important;
+    background: transparent !important;
+  }
 
-          #print-content .mb-12 {
-            margin-bottom: 24pt !important;
-          }
+  /* ================= UTILITY ================= */
+  .print\\:hidden {
+    display: none !important;
+  }
+}
+`}</style>
 
-          /* Flexbox untuk signature alignment */
-          #print-content .flex-col {
-            display: flex !important;
-            flex-direction: column !important;
-          }
-
-          /* Utility */
-          .print\\:hidden {
-            display: none !important;
-          }
-
-          .print\\:border-0 {
-            border: none !important;
-          }
-
-          .print\\:p-0 {
-            padding: 0 !important;
-          }
-
-          input[type="date"],
-          select {
-            appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            background: transparent;
-          }
-
-          /* Pastikan background tercetak */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

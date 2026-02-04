@@ -180,7 +180,7 @@ export default function SuppliersPage() {
             <th style={{ padding: 12 }}>Address</th>
             <th style={{ padding: 12 }}>Credit Limit</th>
             <th style={{ padding: 12 }}>Status</th>
-            <th style={{ padding: 12 }}>Action</th>
+            {/* <th style={{ padding: 12 }}>Action</th> */}
           </tr>
         </thead>
         <tbody>
@@ -200,7 +200,7 @@ export default function SuppliersPage() {
               <td>{c.address ?? "-"}</td>
               <td>{c.credit_limit}</td>
               <td>{c.status}</td>
-              <td>
+              {/* <td>
                 <button
                   onClick={() => handleDelete(c.id)}
                   style={{
@@ -214,7 +214,7 @@ export default function SuppliersPage() {
                 >
                   Delete
                 </button>
-              </td>
+              </td> */}
             </tr>
           ))}
         </tbody>

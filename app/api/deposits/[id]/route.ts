@@ -39,38 +39,46 @@ export async function GET(
       throw paymentsError;
     }
 
-    // 🔥 FIX: Get SO usages with proper join syntax
-    const { data: usages, error: usagesError } = await supabase
-      .from('deposit_usages')
-      .select(`
+   // Line ~40-60, ganti query usages:
+const { data: usages, error: usagesError } = await supabase
+  .from('deposit_usages')
+  .select(`
+    id,
+    do_count,
+    amount_used,
+    created_at,
+    delivery_orders!inner (
+      id,
+      sj_number,
+      delivery_date,
+      sales_orders!inner (
         id,
-        do_count,
-        amount_used,
-        created_at,
-        sales_orders!inner (
-          id,
-          so_number,
-          order_date,
-          ship_to_name,
-          status
-        )
-      `)
-      .eq('deposit_id', id)
-      .order('created_at', { ascending: false });
+        so_number,
+        order_date,
+        ship_to_name,
+        status
+      )
+    )
+  `)
+  .eq('deposit_id', id)
+  .order('created_at', { ascending: false });
 
-    if (usagesError) {
-      console.error('Usages error:', usagesError);
-      throw usagesError;
-    }
-
-    // 🔥 FIX: Transform usages to match frontend expectation
-    const transformedUsages = (usages || []).map((u: any) => ({
-      id: u.id,
-      do_count: u.do_count,
-      amount_used: u.amount_used,
-      created_at: u.created_at,
-      sales_order: u.sales_orders,  // Flatten nested object
-    }));
+// Transform response
+const transformedUsages = (usages || []).map((u: any) => ({
+  id: u.id,
+  do_count: u.do_count,
+  amount_used: u.amount_used,
+  created_at: u.created_at,
+  sj_number: u.delivery_orders.sj_number,
+  delivery_date: u.delivery_orders.delivery_date,
+  sales_order: {
+    id: u.delivery_orders.sales_orders.id,
+    so_number: u.delivery_orders.sales_orders.so_number,
+    order_date: u.delivery_orders.sales_orders.order_date,
+    ship_to_name: u.delivery_orders.sales_orders.ship_to_name,
+    status: u.delivery_orders.sales_orders.status
+  }
+}));
 
     return NextResponse.json({
       deposit,
