@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       price_lock_per_m3,
       total_do_tagged,
       deposit_amount = 0,
+      deposit_date,
       notes = '',
     } = body;
 
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
         price_lock_per_m3,
         total_do_tagged,
         deposit_amount: 0, // Will be updated by payment
+        deposit_date,
         notes,
       })
       .select()

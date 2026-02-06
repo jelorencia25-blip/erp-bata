@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 type Deposit = {
   id: string;
+  deposit_date: string;
   deposit_code: string;
   customer_id: string;
   customer_name: string;
@@ -76,6 +77,14 @@ export default function DepositsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showConfirmationStep, setShowConfirmationStep] = useState(false);
+  <button
+  type="button"
+  onClick={() => setShowConfirmationStep(true)}
+  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+>
+  Review Deposit
+</button>
 
   
 
@@ -100,6 +109,7 @@ export default function DepositsPage() {
     total_do_tagged: '',
     deposit_amount: '',
     notes: '',
+    deposit_date: new Date().toISOString().split('T')[0],
   });
 
   const [topUpForm, setTopUpForm] = useState({
@@ -167,6 +177,7 @@ export default function DepositsPage() {
           total_do_tagged: parseInt(createForm.total_do_tagged),
           deposit_amount: parseFloat(createForm.deposit_amount || '0'),
           notes: createForm.notes,
+          deposit_date: createForm.deposit_date,
         }),
       });
 
@@ -180,6 +191,7 @@ export default function DepositsPage() {
         total_do_tagged: '',
         deposit_amount: '',
         notes: '',
+        deposit_date: new Date().toISOString().split('T')[0], 
       });
     } catch (err: any) {
       setError(err.message);
@@ -312,6 +324,40 @@ export default function DepositsPage() {
           {error}
         </div>
       )}
+      
+
+      // confirmation step can be added here
+      {showConfirmationStep && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+      <h2 className="text-2xl font-bold mb-4">Confirm New Deposit</h2>
+      <div className="space-y-2">
+        <p><strong>Supplier:</strong> {customers.find(c => c.id === createForm.customer_id)?.name}</p>
+        <p><strong>Deposit Date:</strong> {createForm.deposit_date}</p>
+        <p><strong>Harga Lock:</strong> Rp {parseFloat(createForm.price_lock_per_m3 || '0').toLocaleString('id-ID')}/m³</p>
+        <p><strong>Total DO Tagged:</strong> {createForm.total_do_tagged}</p>
+        <p><strong>Initial Deposit:</strong> Rp {parseFloat(createForm.deposit_amount || '0').toLocaleString('id-ID')}</p>
+        {createForm.notes && <p><strong>Notes:</strong> {createForm.notes}</p>}
+      </div>
+
+      <div className="flex justify-end gap-2 mt-6">
+        <button
+          onClick={() => setShowConfirmationStep(false)}
+          className="px-4 py-2 border rounded hover:bg-gray-100"
+        >
+          Back
+        </button>
+        <button
+          onClick={handleCreate} // ini baru beneran create
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Confirm & Create
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* TABLE */}
       <div className="overflow-x-auto bg-white shadow rounded-lg">
@@ -319,6 +365,7 @@ export default function DepositsPage() {
           <thead className="bg-gray-100 text-gray-700 uppercase text-sm">
             <tr>
               <th className="p-3 text-left">No</th>
+              <th className="p-3 text-left">Tanggal</th>
               <th className="p-3 text-left">Kode Deposit</th>
               <th className="p-3 text-left">Supplier</th>
               <th className="p-3 text-right">Harga Lock (per m³)</th>
@@ -350,6 +397,7 @@ export default function DepositsPage() {
               filteredDeposits.map((d, index) => (
                 <tr key={d.id} className="border-b hover:bg-gray-50">
                   <td className="p-3 text-gray-600 font-medium">{index + 1}</td>
+                  <td className="p-3">{d.deposit_date}</td>
                   <td className="p-3 font-semibold text-blue-600">{d.deposit_code}</td>
                   <td className="p-3">{d.customer_name}</td>
                   <td className="p-3 text-right">
@@ -406,6 +454,21 @@ export default function DepositsPage() {
             <h2 className="text-2xl font-bold mb-4">Create New Deposit</h2>
             <form onSubmit={handleCreate}>
               <div className="space-y-4">
+                <div>
+  <label className="block text-sm font-medium mb-1">
+    Deposit Date <span className="text-red-500">*</span>
+  </label>
+  <input
+    type="date"
+    required
+    value={createForm.deposit_date}
+    onChange={(e) =>
+      setCreateForm({ ...createForm, deposit_date: e.target.value })
+    }
+    className="w-full border rounded px-3 py-2"
+  />
+</div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Supplier <span className="text-red-500">*</span>

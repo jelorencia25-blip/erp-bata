@@ -7,6 +7,7 @@ type PaymentRow = {
   delivery_order_id: string;
   no_sj: string;
   tgl: string | null;
+  deposit_code: string | null;
   supplier: string;
   ref_supplier: string;
   kepada: string;
@@ -52,9 +53,11 @@ export default function PaymentsPage() {
     return data.filter((d) => {
       const keyword = search.toLowerCase();
       const matchSearch =
-        !keyword ||
-        d.no_sj.toLowerCase().includes(keyword) ||
-        d.supplier.toLowerCase().includes(keyword);
+  !keyword ||
+  d.no_sj.toLowerCase().includes(keyword) ||
+  d.supplier.toLowerCase().includes(keyword) ||
+  d.deposit_code?.toLowerCase().includes(keyword);
+
 
       const rowDate = d.tgl ? new Date(d.tgl).setHours(0, 0, 0, 0) : null;
       const from = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
@@ -102,7 +105,7 @@ export default function PaymentsPage() {
       <div className="flex flex-col md:flex-row gap-2 mb-4">
         <input
           type="text"
-          placeholder="Cari No SJ / Nama Supplier"
+          placeholder="Cari No SJ / Nama Supplier / Kode Deposit"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300"
@@ -132,7 +135,7 @@ export default function PaymentsPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {["No","No SJ","Tgl","Supplier","Ref Supplier","Kepada","Total Tagihan","Overdue","Status"].map((h) => (
+              {["No", "Kode Deposit", "No SJ","Tgl","Supplier","Ref Supplier","Kepada","Total Tagihan","Overdue","Status"].map((h) => (
                 <th key={h} className="p-3 text-left">{h}</th>
               ))}
             </tr>
@@ -156,6 +159,9 @@ export default function PaymentsPage() {
                   } hover:${row.status === "paid" ? "bg-green-300" : "bg-red-300"} transition-colors duration-150`}
                 >
                   <td className="p-3">{i + 1}</td>
+                  <td className="p-3 font-medium">
+                  {row.deposit_code ?? "-"}
+                </td>
                   <td className="p-3 font-medium">{row.no_sj}</td>
                   <td className="p-3">{row.tgl ? new Date(row.tgl).toLocaleDateString("id-ID") : "-"}</td>
                   <td className="p-3">{row.supplier}</td>

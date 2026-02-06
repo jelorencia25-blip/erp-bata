@@ -27,6 +27,7 @@ type DeliveryReturnItem = {
 type Delivery = {
   id: string;
   sj_number: string;
+  no_gudang?: string | null;
   so_number: string;
   order_date: string;
   customer_name: string;
@@ -46,6 +47,7 @@ export default function DeliveryProcessedDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   
+  const [noGudang, setNoGudang] = useState("");
   const [data, setData] = useState<Delivery | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,13 @@ export default function DeliveryProcessedDetailPage() {
         const res = await fetch(`/api/deliveries/processed/${id}`);
         if (!res.ok) throw new Error((await res.json()).error || "Gagal load data");
         const json: Delivery = await res.json();
-        setData(json);
+
+console.log("DELIVERY RESPONSE:", json);
+console.log("NO GUDANG:", json.no_gudang);
+
+setData(json);
+setNoGudang(json.no_gudang ?? "");
+
 
         const [driversRes, vehiclesRes] = await Promise.all([
           fetch(`/api/staffsmanagement`).then(r => r.json()),
@@ -79,7 +87,7 @@ export default function DeliveryProcessedDetailPage() {
         ]);
         setDrivers(driversRes.filter((d: any) => d.status === "active" && d.posisi?.toLowerCase().includes("supir")));
         setVehicles(vehiclesRes.filter((v: any) => v.status === "active"));
-
+        setNoGudang(json.no_gudang ?? "");
         setDriverId(json.staff?.id ?? "");
         setVehicleId(json.vehicle?.id ?? "");
 
@@ -116,7 +124,8 @@ export default function DeliveryProcessedDetailPage() {
         body: JSON.stringify({ 
           driver_id: driverId, 
           vehicle_id: vehicleId, 
-          returns 
+          no_gudang: noGudang,
+          returns,
         }),
       });
       const result = await res.json();
@@ -285,18 +294,32 @@ export default function DeliveryProcessedDetailPage() {
           {item.product_name}
           {item.product_size ? ` (${item.product_size})` : ""}
         </td>
-        <td className="text-center">
-          <span className="print:hidden">
-            <input
-              type="number"
-              value={returns[item.id]?.qty || 0}
-              className="w-16 border text-center"
-            />
-          </span>
-          <span className="hidden print:inline">
-            {returns[item.id]?.qty || 0}
-          </span>
-        </td>
+       <td className="text-center">
+  <span className="print:hidden">
+    <input
+      type="number"
+      min={0}
+      value={returns[item.id]?.qty ?? 0}
+      onChange={(e) => {
+        const val = e.target.value === "" ? 0 : Number(e.target.value);
+
+        setReturns((prev) => ({
+          ...prev,
+          [item.id]: {
+            ...prev[item.id],
+            qty: val,
+          },
+        }));
+      }}
+      className="w-16 border text-center"
+    />
+  </span>
+
+  <span className="hidden print:inline">
+    {returns[item.id]?.qty ?? 0}
+  </span>
+</td>
+
       </tr>
     ))}
   </tbody>
@@ -304,7 +327,25 @@ export default function DeliveryProcessedDetailPage() {
 
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-4">
+        <div className="grid grid-cols-3 gap-6 mb-4">
+<div>
+  <label className="block font-semibold mb-1">No Gudang</label>
+
+  <div className="print:hidden">
+    <input
+      type="text"
+      value={noGudang}
+      onChange={(e) => setNoGudang(e.target.value)}
+      className="w-full border border-gray-300 rounded px-3 py-2"
+    />
+  </div>
+
+  <div className="hidden print:block border-b border-gray-300 py-1">
+    {noGudang || "-"}
+  </div>
+</div>
+
+
           <div>
             <label className="block font-semibold mb-1">Supir</label>
             <div className="print:hidden">

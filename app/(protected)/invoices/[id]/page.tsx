@@ -308,24 +308,46 @@ export default function InvoiceDetailPage() {
           {/* LEFT - Bank & Signature */}
           <div className="flex flex-col">
             {/* REKENING TRANSFER - Content gede, label kecil */}
-            <div className="mb-3 border-2 border-black p-2">
-              <div className="font-bold text-sm mb-1">Rekening Transfer</div>
-              <select
-                value={selectedBank}
-                onChange={(e) => {
-                  console.log("Bank selected:", e.target.value);
-                  setSelectedBank(e.target.value);
-                }}
-                className="w-full border border-black p-1.5 text-sm font-bold leading-tight print:border-0 print:p-0"
-              >
-                <option value="">-- Pilih Rekening --</option>
-                {bankAccounts.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.bank_name} - {b.account_number} - A/N {b.account_holder}
-                  </option>
-                ))}
-              </select>
-            </div>
+           {/* REKENING TRANSFER FIXED */}
+{/* DROPDOWN UNTUK EDIT */}
+<div className="mb-3 border-2 border-black p-2 print:hidden">
+  <select
+    value={selectedBank || ""}
+    onChange={(e) => setSelectedBank(e.target.value)}
+    className="w-full border border-black p-1.5 text-sm font-bold"
+  >
+    <option value="">-- Pilih Rekening --</option>
+    {bankAccounts.map((b) => (
+      <option key={b.id} value={b.id}>
+        {b.bank_name} - {b.account_number} - A/N {b.account_holder}
+      </option>
+    ))}
+  </select>
+</div>
+
+{/* REKENING TRANSFER FIXED UNTUK PRINT */}
+<div className="mb-3 border-2 border-black p-2">
+  <table className="w-full border-collapse">
+    <tbody>
+      <tr>
+        <td className="font-bold">
+          {bankAccounts.length > 0 && selectedBank
+            ? `${bankAccounts.find(b => b.id === selectedBank)?.bank_name} – ${bankAccounts.find(b => b.id === selectedBank)?.account_number}`
+            : "BCA – NOREK" /* fallback */}
+        </td>
+      </tr>
+      <tr>
+        <td className="font-bold">
+          {bankAccounts.length > 0 && selectedBank
+            ? `A/N ${bankAccounts.find(b => b.id === selectedBank)?.account_holder}`
+            : "A/N" /* fallback */}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
 
             {/* TERBILANG - Lebih besar */}
             <div className="text-base italic mb-3 font-semibold">
@@ -379,26 +401,30 @@ export default function InvoiceDetailPage() {
 
       {/* PRINT STYLES */}
       <style jsx global>{`
+
 @media print {
 
   /* ================= PAGE ================= */
   @page {
     size: A4 portrait;
-    margin: 14mm 12mm 18mm 12mm; /* bawah lebih lega */
+    margin: 14mm 12mm 18mm 12mm;
   }
 
   body {
     font-family: "Courier New", Courier, monospace !important;
-    color: #000 !important;
+    color: #000 !important; /* pitch black text */
+    background: #fff !important; /* ensure white background */
   }
 
   body * {
-    visibility: hidden;
+    visibility: hidden; /* hide everything by default */
   }
 
   #print-content,
   #print-content * {
     visibility: visible;
+    color: #000 !important; /* force pitch black */
+    font-weight: 700 !important; /* max bold */
   }
 
   #print-content {
@@ -410,6 +436,7 @@ export default function InvoiceDetailPage() {
     border: 1.5pt solid #000 !important;
     font-size: 12pt !important;
     line-height: 1.2 !important;
+    background: #fff !important;
   }
 
   /* ================= TITLE ================= */
@@ -417,15 +444,17 @@ export default function InvoiceDetailPage() {
     font-size: 16pt !important;
     font-weight: 700 !important;
     margin-bottom: 6pt !important;
+    color: #000 !important;
   }
 
   /* ================= HEADER ================= */
   #print-content .border-b-2 {
-    border-bottom: 1.2pt solid #000 !important;
+    border-bottom: 1.5pt solid #000 !important;
   }
 
   #print-content .font-bold {
     font-weight: 700 !important;
+    color: #000 !important;
   }
 
   /* ================= TABLE ================= */
@@ -433,71 +462,76 @@ export default function InvoiceDetailPage() {
     width: 100% !important;
     border-collapse: collapse !important;
     font-size: 11.5pt !important;
+    color: #000 !important;
+    background: #fff !important;
   }
 
   th,
-  td {
+  td,
+  th *,
+  td * {
     border: 1pt solid #000 !important;
     padding: 3pt 4pt !important;
     vertical-align: middle !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    background: #fff !important;
   }
 
   th {
     text-align: center !important;
-    font-weight: 700 !important;
-    background: none !important; /* ❌ NO HITAM */
   }
 
   thead {
-    background: none !important;
+    background: #fff !important;
   }
 
   /* ================= TERBILANG ================= */
-  /* PENTING: JANGAN BOLD */
   #print-content .italic {
     font-style: italic !important;
-    font-weight: 400 !important;
-    font-size: 12pt !important;
+    font-weight: 700 !important; /* still normal for terbilang */
+    color: #000 !important;
   }
 
   #print-content .italic .font-bold {
-    font-weight: 400 !important;
+    font-weight: 700 !important;
   }
 
   /* ================= TOTAL ================= */
   #print-content .border-2.border-black {
     border: 1.5pt solid #000 !important;
-    background: none !important; /* ❌ NO ABU */
+    background: #fff !important;
+    color: #000 !important;
+    font-weight: 700 !important;
   }
 
-    /* ================= REKENING TRANSFER ================= */
-  #print-content .border-2.border-black.p-2 {
-    font-size: 10pt !important;     /* 🔥 GEDE BANGET */
-    font-weight: 1000 !important;
+  /* ================= REKENING TRANSFER ================= */
+  #print-content .rekening-transfer {
+    font-size: 10pt !important;
+    font-weight: 700 !important;
     line-height: 1 !important;
-
     white-space: normal !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
-
     padding: 8pt 10pt !important;
     margin-top: 6pt !important;
-
     page-break-inside: avoid !important;
+    color: #000 !important;
+    background: #fff !important;
   }
 
-  /* kalau ada teks kecil di dalamnya (misal span / p) */
-  #print-content .border-2.border-black.p-2 * {
+  #print-content .rekening-transfer * {
     font-size: inherit !important;
     font-weight: inherit !important;
+    color: #000 !important;
   }
-
 
   /* ================= SIGNATURE ================= */
   .signature-box {
     min-height: 70pt !important;
     padding-top: 10pt !important;
     text-align: center !important;
+    color: #000 !important;
   }
 
   .signature-line {
@@ -506,6 +540,7 @@ export default function InvoiceDetailPage() {
     border-top: 1pt solid #000 !important;
     padding-top: 2pt !important;
     font-size: 8pt !important;
+    color: #000 !important;
   }
 
   /* ================= FORM ELEMENT ================= */
@@ -515,13 +550,18 @@ export default function InvoiceDetailPage() {
     padding: 0 !important;
     appearance: none !important;
     background: transparent !important;
+    color: #000 !important;
+    font-weight: 700 !important;
   }
 
   /* ================= UTILITY ================= */
   .print\\:hidden {
     display: none !important;
   }
+
 }
+
+
 `}</style>
 
     </div>

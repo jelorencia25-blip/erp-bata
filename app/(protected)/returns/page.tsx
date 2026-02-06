@@ -8,6 +8,8 @@ type ReturnRow = {
   id: string;
   created_at: string | null;
   tanggal: string | null;
+  no_gudang: string | null;
+  deposit_code: string | null;
   sj_number: string;
   so_number: string;
   customer_name: string;
@@ -60,8 +62,10 @@ export default function ReturnsPage() {
     const keyword = search.toLowerCase();
     result = result.filter((r) =>
       r.customer_name?.toLowerCase().includes(keyword) ||
+     r.no_gudang?.toLowerCase().includes(keyword) ||
       r.sj_number?.toLowerCase().includes(keyword) ||
-      r.so_number?.toLowerCase().includes(keyword)
+      r.so_number?.toLowerCase().includes(keyword) ||
+      r.deposit_code?.toLowerCase().includes(keyword)
     );
   }
 
@@ -138,6 +142,8 @@ export default function ReturnsPage() {
       filteredData.map((r, i) => ({
         No: i + 1,
         Tanggal: r.tanggal,
+        'No Gudang': r.no_gudang,
+        'Kode Deposit': r.deposit_code,
         'No SJ': r.sj_number,
         'No SO': r.so_number,
         Supplier: r.customer_name,
@@ -235,6 +241,8 @@ export default function ReturnsPage() {
               <th className="px-4 py-3 text-center">No</th>
               {[
                 ['tanggal', 'Tanggal'],
+                 ['no_gudang', 'No Gudang'],
+                ['deposit_code', 'Kode Deposit'],
                 ['sj_number', 'No SJ'],
                 ['so_number', 'No SO'],
                 ['customer_name', 'Supplier'],
@@ -270,6 +278,15 @@ export default function ReturnsPage() {
                     ? new Date(row.tanggal).toLocaleDateString('id-ID')
                     : '-'}
                 </td>
+                <td className="px-4 py-2 text-center">
+  {row.no_gudang ?? '-'}
+</td>
+
+             <td className="px-4 py-2">
+  {row.deposit_code ?? '-'}
+</td>
+
+
                 <td className="px-4 py-2">{row.sj_number}</td>
                 <td className="px-4 py-2">{row.so_number}</td>
                 <td className="px-4 py-2">{row.customer_name}</td>

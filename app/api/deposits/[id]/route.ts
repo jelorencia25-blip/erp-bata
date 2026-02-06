@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> }  // 🔥 FIX: await params
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,7 +13,7 @@ export async function GET(
   );
 
   try {
-    const { id } = await context.params;  // 🔥 AWAIT THIS
+    const { id } = await context.params;
 
     // Get deposit details
     const { data: deposit, error: depositError } = await supabase
@@ -39,46 +39,47 @@ export async function GET(
       throw paymentsError;
     }
 
-   // Line ~40-60, ganti query usages:
-const { data: usages, error: usagesError } = await supabase
-  .from('deposit_usages')
-  .select(`
-    id,
-    do_count,
-    amount_used,
-    created_at,
-    delivery_orders!inner (
-      id,
-      sj_number,
-      delivery_date,
-      sales_orders!inner (
+    // 🔥 FIX: Get usages (SO dengan/tanpa delivery)
+    const { data: usages, error: usagesError } = await supabase
+      .from('deposit_usages')
+      .select(`
         id,
-        so_number,
-        order_date,
-        ship_to_name,
-        status
-      )
-    )
-  `)
-  .eq('deposit_id', id)
-  .order('created_at', { ascending: false });
+        do_count,
+        amount_used,
+        created_at,
+        
+        sales_orders!inner (
+          id,
+          so_number,
+          order_date,
+          ship_to_name,
+          status
+        ),
+        
+        delivery_orders (
+          id,
+          sj_number,
+          delivery_date
+        )
+      `)
+      .eq('deposit_id', id)
+      .order('created_at', { ascending: false });
 
-// Transform response
-const transformedUsages = (usages || []).map((u: any) => ({
-  id: u.id,
-  do_count: u.do_count,
-  amount_used: u.amount_used,
-  created_at: u.created_at,
-  sj_number: u.delivery_orders.sj_number,
-  delivery_date: u.delivery_orders.delivery_date,
-  sales_order: {
-    id: u.delivery_orders.sales_orders.id,
-    so_number: u.delivery_orders.sales_orders.so_number,
-    order_date: u.delivery_orders.sales_orders.order_date,
-    ship_to_name: u.delivery_orders.sales_orders.ship_to_name,
-    status: u.delivery_orders.sales_orders.status
-  }
-}));
+    if (usagesError) {
+      console.error('Usages error:', usagesError);
+      throw usagesError;
+    }
+
+    // 🔥 FIX: Transform usages
+    const transformedUsages = (usages || []).map((u: any) => ({
+      id: u.id,
+      do_count: u.do_count,
+      amount_used: u.amount_used,
+      created_at: u.created_at,
+      sj_number: u.delivery_orders?.sj_number || '-',
+      delivery_date: u.delivery_orders?.delivery_date || '-',
+      sales_order: u.sales_orders,
+    }));
 
     return NextResponse.json({
       deposit,
@@ -91,9 +92,10 @@ const transformedUsages = (usages || []).map((u: any) => ({
   }
 }
 
+// PATCH & DELETE handlers tetap sama...
 export async function PATCH(
   request: Request,
-  context: { params: Promise<{ id: string }> }  // 🔥 FIX
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,7 +103,7 @@ export async function PATCH(
   );
 
   try {
-    const { id } = await context.params;  // 🔥 AWAIT
+    const { id } = await context.params;
     const body = await request.json();
 
     const { error } = await supabase
@@ -131,7 +133,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  context: { params: Promise<{ id: string }> }  // 🔥 FIX
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -139,7 +141,7 @@ export async function DELETE(
   );
 
   try {
-    const { id } = await context.params;  // 🔥 AWAIT
+    const { id } = await context.params;
 
     const { data: usages } = await supabase
       .from('deposit_usages')
