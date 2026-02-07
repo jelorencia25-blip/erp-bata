@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 type Vehicle = { id: string; plate_number: string };
 type Staff = { id: string; name: string };
@@ -59,6 +61,9 @@ export default function DeliveryProcessedDetailPage() {
 
   const [drivers, setDrivers] = useState<Staff[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+
+
 
   useEffect(() => {
     if (!id) {
@@ -108,7 +113,67 @@ setNoGudang(json.no_gudang ?? "");
     };
 
     loadData();
+    
   }, [id]);
+
+
+ const stripUnsupportedColors = (el: HTMLElement) => {
+  const all = el.querySelectorAll("*");
+
+  all.forEach((node) => {
+    const style = window.getComputedStyle(node);
+
+    [
+      "color",
+      "backgroundColor",
+      "borderColor",
+    ].forEach((prop) => {
+      const value = style[prop as any];
+      if (value?.includes("lab(") || value?.includes("oklab(")) {
+        (node as HTMLElement).style[prop as any] = "#000";
+      }
+    });
+  });
+};
+
+const handleDownloadPdf = async () => {
+  const element = document.getElementById("print-content");
+  if (!element) return;
+
+  // 🔥 PENTING
+  stripUnsupportedColors(element);
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position -= pageHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save(`Surat-Jalan-${data?.sj_number}.pdf`);
+};
+  
+
+
 
   const handleSave = async () => {
     if (!driverId || !vehicleId) {
@@ -183,6 +248,16 @@ setNoGudang(json.no_gudang ?? "");
           >
             Print
           </button>
+{/* 
+          <button
+  onClick={handleDownloadPdf}
+  className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 transition"
+>
+  Download PDF
+</button> */}
+
+
+
           <button 
             onClick={handleSave}
             disabled={saving}
@@ -193,7 +268,7 @@ setNoGudang(json.no_gudang ?? "");
         </div>
       </div>
 
-      <div id="print-content" className="bg-white rounded-lg shadow-sm p-8">
+<div id="print-content" className="print-root">
         <div className="text-center border-b-2 border-gray-300 pb-3 mb-4">
           <h1 className="text-2xl font-bold">
             Surat Jalan – {data.sj_number}
@@ -419,104 +494,99 @@ setNoGudang(json.no_gudang ?? "");
       </div>
 
 <style jsx global>{`
-  @media print {
+ @media print {
 
-    /* ================= PAGE ================= */
-    @page {
-      size: A4 portrait;
-      margin: 6mm 6mm;
-    }
-
-    body {
-      font-family: "Courier New", Courier, monospace !important;
-      font-weight: 600 !important;
-      color: #000 !important;
-    }
-
-    body * {
-      visibility: hidden;
-    }
-
-    #print-content,
-    #print-content * {
-      visibility: visible;
-    }
-
-    #print-content {
-      position: absolute;
-      inset: 0;
-      padding: 0 !important;
-      margin: 0 !important;
-      box-shadow: none !important;
-      font-size: 12pt !important;
-      line-height: 1.1 !important;
-    }
-
-    /* ================= HEADER ================= */
-    #print-content h1 {
-      font-size: 16pt !important;
-      margin: 0 0 4pt 0 !important;
-      padding-bottom: 4pt !important;
-      border-bottom: 1pt solid #000 !important;
-    }
-
-    #print-content .font-semibold {
-      font-weight: 700 !important;
-      font-size: 12pt !important;
-    }
-
-    #print-content .border-b {
-      border-bottom: 0.8pt solid #000 !important;
-    }
-
-    /* ================= TABLE ================= */
-    .sj-table {
-      width: 100%;
-      border-collapse: collapse !important;
-      border: 1pt solid #000 !important;
-      font-size: 11.5pt !important;
-    }
-
-    .sj-table th,
-    .sj-table td {
-      border: 0.8pt solid #000 !important;
-      padding: 2pt 4pt !important;
-      vertical-align: middle !important;
-    }
-
-    .sj-table th {
-      font-weight: 700 !important;
-      text-align: center;
-    }
-
-    .sj-table thead {
-      background: none !important;
-    }
-
-    /* ================= PRINT UTILS ================= */
-    .print\\:hidden {
-      display: none !important;
-    }
-
-    .print\\:inline {
-      display: inline !important;
-    }
-
-    .print\\:block {
-      display: block !important;
-    }
-
-    /* ================= SIGNATURE ================= */
-    #print-content .grid-cols-4 {
-      margin-top: 10pt !important;
-    }
-
-    #print-content .grid-cols-4 p {
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
+  @page {
+    size: A4 portrait;
+    margin: 6mm 6mm;
   }
+
+  /* ================= FORCE READABLE ================= */
+  body {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 12pt !important;
+    font-weight: 700 !important;
+    color: #000 !important;
+
+    -webkit-font-smoothing: none !important;
+    -moz-osx-font-smoothing: auto !important;
+    text-rendering: optimizeSpeed !important;
+  }
+
+  body * {
+    visibility: hidden;
+    color: #000 !important;
+  }
+
+  #print-content,
+  #print-content * {
+    visibility: visible !important;
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: none !important;
+  }
+
+  #print-content {
+    position: absolute;
+    inset: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 12pt !important;
+    line-height: 1.15 !important;
+  }
+
+  /* ================= HEADER ================= */
+  #print-content h1 {
+    font-size: 16pt !important;
+    font-weight: 800 !important;
+    margin: 0 0 4pt 0 !important;
+    padding-bottom: 4pt !important;
+    border-bottom: 1.2pt solid #000 !important;
+  }
+
+  /* ================= TEXT ================= */
+  #print-content span,
+  #print-content p,
+  #print-content td,
+  #print-content th {
+    font-weight: 700 !important;
+    color: #000 !important;
+  }
+
+  /* ================= TABLE ================= */
+  .sj-table {
+    width: 100%;
+    border-collapse: collapse !important;
+    border: 1.2pt solid #000 !important;
+    font-size: 11.8pt !important;
+  }
+
+  .sj-table th,
+  .sj-table td {
+    border: 1pt solid #000 !important;
+    padding: 3pt 4pt !important;
+    vertical-align: middle !important;
+  }
+
+  .sj-table th {
+    font-weight: 800 !important;
+    text-align: center;
+  }
+
+  /* ================= PRINT UTILS ================= */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:inline {
+    display: inline !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+}
 `}</style>
 
 
