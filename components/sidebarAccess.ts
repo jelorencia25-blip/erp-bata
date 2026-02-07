@@ -71,6 +71,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
     "Vehicles",
     "Products",
     "Suppliers",
+     "Staffs Management",
   ],
 
   // mapping role lama
