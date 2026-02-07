@@ -67,6 +67,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabase.rpc("rpc_create_sales_order", {
       p_customer_id: body.customer_id,
+      p_order_date: body.order_date, // 🔥 WAJIB
       p_customer_order_ref: body.customer_order_ref ?? null,
       p_ship_to_name: body.ship_to_name ?? null,
       p_contact_phone: body.contact_phone ?? null,

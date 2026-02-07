@@ -1,18 +1,14 @@
 export const dynamic = 'force-dynamic'
 
-
 // app/api/deliveries/processed/[id]/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-
 
 // ============ EXISTING GET METHOD ============
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-
   const { id } = await params;
 
   if (!id) {
@@ -20,9 +16,9 @@ export async function GET(
   }
 
   const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   
   try {
     const { data: delivery, error: deliveryError } = await supabase
@@ -30,6 +26,7 @@ export async function GET(
       .select(`
         id,
         sj_number,
+        no_gudang,
         delivery_date,
         driver_id,
         vehicle_id,
@@ -133,6 +130,7 @@ export async function GET(
     return NextResponse.json({
       id: delivery.id,
       sj_number: delivery.sj_number ?? "-",
+      no_gudang: delivery.no_gudang ?? "",
       so_number: salesOrder?.so_number ?? "-",
       order_date: delivery.delivery_date ?? "-",
       customer_name: customerName,
@@ -168,30 +166,30 @@ export async function PUT(
     return NextResponse.json({ error: "ID tidak boleh kosong" }, { status: 400 });
   }
 
-    const supabase = createClient(
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-
   try {
     const body = await req.json();
-    const { driver_id, vehicle_id, returns } = body;
+    const { driver_id, vehicle_id, no_gudang, returns } = body;
 
-    console.log("📝 Update Processed Delivery:", { id, driver_id, vehicle_id, returns });
+    console.log("📝 Update Processed Delivery:", { id, driver_id, vehicle_id, no_gudang, returns });
 
-    // Update driver & vehicle
+    // Update driver, vehicle & no_gudang
     if (driver_id && vehicle_id) {
       const { error: updateError } = await supabase
         .from("delivery_orders")
         .update({
           driver_id,
           vehicle_id,
+          no_gudang: no_gudang ?? "",
         })
         .eq("id", id);
 
       if (updateError) throw updateError;
-      console.log("✅ Driver & Vehicle updated");
+      console.log("✅ Driver, Vehicle & No Gudang updated");
     }
 
     // Update return items

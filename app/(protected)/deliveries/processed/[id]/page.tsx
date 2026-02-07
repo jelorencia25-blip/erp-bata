@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -61,9 +61,6 @@ export default function DeliveryProcessedDetailPage() {
 
   const [drivers, setDrivers] = useState<Staff[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-
-
 
   useEffect(() => {
     if (!id) {
@@ -75,26 +72,37 @@ export default function DeliveryProcessedDetailPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/deliveries/processed/${id}`);
+        const apiUrl = `/api/deliveries/processed/${id}`;
+    console.log("🌐 FETCHING URL:", apiUrl);
+    
+    const res = await fetch(apiUrl);
+    console.log("🌐 Response URL:", res.url);
+    console.log("🌐 Response status:", res.status);
         if (!res.ok) throw new Error((await res.json()).error || "Gagal load data");
         const json: Delivery = await res.json();
 
-console.log("DELIVERY RESPONSE:", json);
-console.log("NO GUDANG:", json.no_gudang);
+        console.log("DELIVERY RESPONSE:", json);
+        console.log("NO GUDANG:", json.no_gudang);
+      
+// 🔥 TARUH DEBUG LOGS DI SINI (SEBELUM setData)
+console.log("🔍 RAW API RESPONSE:", JSON.stringify(json, null, 2));
+console.log("🔍 no_gudang:", json.no_gudang);
+console.log("🔍 no_gudang type:", typeof json.no_gudang);
+console.log("🔍 no_gudang === null?", json.no_gudang === null);
+console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
-setData(json);
-setNoGudang(json.no_gudang ?? "");
-
+        setData(json);
+        setNoGudang(json.no_gudang ?? "");
+        setDriverId(json.staff?.id ?? "");
+        setVehicleId(json.vehicle?.id ?? "");
 
         const [driversRes, vehiclesRes] = await Promise.all([
           fetch(`/api/staffsmanagement`).then(r => r.json()),
           fetch(`/api/vehicles`).then(r => r.json()),
         ]);
+        
         setDrivers(driversRes.filter((d: any) => d.status === "active" && d.posisi?.toLowerCase().includes("supir")));
         setVehicles(vehiclesRes.filter((v: any) => v.status === "active"));
-        setNoGudang(json.no_gudang ?? "");
-        setDriverId(json.staff?.id ?? "");
-        setVehicleId(json.vehicle?.id ?? "");
 
         const initialReturns: Record<string, { qty: number; reason: string }> = {};
         json.delivery_items.forEach(item => {
@@ -113,67 +121,105 @@ setNoGudang(json.no_gudang ?? "");
     };
 
     loadData();
-    
   }, [id]);
 
-
- const stripUnsupportedColors = (el: HTMLElement) => {
-  const all = el.querySelectorAll("*");
-
-  all.forEach((node) => {
-    const style = window.getComputedStyle(node);
-
-    [
-      "color",
-      "backgroundColor",
-      "borderColor",
-    ].forEach((prop) => {
-      const value = style[prop as any];
-      if (value?.includes("lab(") || value?.includes("oklab(")) {
-        (node as HTMLElement).style[prop as any] = "#000";
-      }
-    });
-  });
-};
-
-const handleDownloadPdf = async () => {
-  const element = document.getElementById("print-content");
-  if (!element) return;
-
-  // 🔥 PENTING
-  stripUnsupportedColors(element);
-
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    backgroundColor: "#ffffff",
-  });
-
-  const imgData = canvas.toDataURL("image/png");
-
-  const pdf = new jsPDF("p", "mm", "a4");
-
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const imgHeight = (canvas.height * pageWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position -= pageHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save(`Surat-Jalan-${data?.sj_number}.pdf`);
-};
   
 
+  const stripUnsupportedColors = (el: HTMLElement) => {
+    const all = el.querySelectorAll("*");
 
+    all.forEach((node) => {
+      const style = window.getComputedStyle(node);
+
+      [
+        "color",
+        "backgroundColor",
+        "borderColor",
+        "borderTopColor",
+        "borderRightColor", 
+        "borderBottomColor",
+        "borderLeftColor",
+      ].forEach((prop) => {
+        const value = style[prop as any];
+        if (value?.includes("lab(") || value?.includes("oklab(") || value?.includes("lch(")) {
+          (node as HTMLElement).style[prop as any] = "#000";
+        }
+      });
+    });
+  };
+
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById("print-content");
+    if (!element) {
+      alert("Element tidak ditemukan");
+      return;
+    }
+
+    // Clone element untuk tidak mengganggu tampilan asli
+    const clone = element.cloneNode(true) as HTMLElement;
+    
+    // Hide print-only elements dan show hidden print inputs
+    clone.querySelectorAll('.print\\:hidden').forEach(el => {
+      (el as HTMLElement).style.display = 'none';
+    });
+    clone.querySelectorAll('.hidden.print\\:inline').forEach(el => {
+      (el as HTMLElement).style.display = 'inline';
+    });
+    clone.querySelectorAll('.hidden.print\\:block').forEach(el => {
+      (el as HTMLElement).style.display = 'block';
+    });
+
+    // Append ke body sementara (agar bisa di-render)
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.width = '210mm'; // A4 width
+    clone.style.padding = '10mm';
+    clone.style.backgroundColor = '#ffffff';
+    document.body.appendChild(clone);
+
+    // Strip unsupported colors
+    stripUnsupportedColors(clone);
+
+    try {
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        logging: false,
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Surat-Jalan-${data?.sj_number}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Gagal generate PDF");
+    } finally {
+      // Remove clone
+      document.body.removeChild(clone);
+    }
+  };
 
   const handleSave = async () => {
     if (!driverId || !vehicleId) {
@@ -248,15 +294,13 @@ const handleDownloadPdf = async () => {
           >
             Print
           </button>
-{/* 
+
           <button
-  onClick={handleDownloadPdf}
-  className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 transition"
->
-  Download PDF
-</button> */}
-
-
+            onClick={handleDownloadPdf}
+            className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 transition"
+          >
+            Download PDF
+          </button>
 
           <button 
             onClick={handleSave}
@@ -268,7 +312,7 @@ const handleDownloadPdf = async () => {
         </div>
       </div>
 
-<div id="print-content" className="print-root">
+      <div id="print-content" className="bg-white p-10 rounded shadow">
         <div className="text-center border-b-2 border-gray-300 pb-3 mb-4">
           <h1 className="text-2xl font-bold">
             Surat Jalan – {data.sj_number}
@@ -323,103 +367,98 @@ const handleDownloadPdf = async () => {
         </div>
 
         <div className="mb-3">
-         <table className="w-full border-collapse sj-table">
-  <thead>
-    <tr>
-      <th className="text-center w-8">No</th>
-      <th className="text-left">Barang / Ukuran</th>
-      <th className="text-center w-20">Isi / Palet</th>
-      <th className="text-center w-16">Palet</th>
-      <th className="text-center w-20">PCS</th>
-    </tr>
-  </thead>
-  <tbody>
-    {data.delivery_items.map((item, idx) => (
-      <tr key={item.id}>
-        <td className="text-center">{idx + 1}</td>
-        <td>
-          {item.product_name}
-          {item.product_size ? ` (${item.product_size})` : ""}
-        </td>
-        <td className="text-center">
-          {item.isi_per_palet || "-"}
-        </td>
-        <td className="text-center">{item.pallet_qty}</td>
-        <td className="text-center">{item.total_pcs}</td>
-      </tr>
-    ))}
-  </tbody>
-</table>
-
+          <table className="w-full border-collapse sj-table">
+            <thead>
+              <tr>
+                <th className="text-center w-8">No</th>
+                <th className="text-left">Barang / Ukuran</th>
+                <th className="text-center w-20">Isi / Palet</th>
+                <th className="text-center w-16">Palet</th>
+                <th className="text-center w-20">PCS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.delivery_items.map((item, idx) => (
+                <tr key={item.id}>
+                  <td className="text-center">{idx + 1}</td>
+                  <td>
+                    {item.product_name}
+                    {item.product_size ? ` (${item.product_size})` : ""}
+                  </td>
+                  <td className="text-center">
+                    {item.isi_per_palet || "-"}
+                  </td>
+                  <td className="text-center">{item.pallet_qty}</td>
+                  <td className="text-center">{item.total_pcs}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         <div className="mb-3">
-         
-        <table className="w-full border-collapse sj-table mt-2">
-  <thead>
-    <tr>
-      <th className="text-left">Retur Barang</th>
-      <th className="text-center w-20">PCS</th>
-    </tr>
-  </thead>
-  <tbody>
-    {data.delivery_items.map((item) => (
-      <tr key={item.id}>
-        <td>
-          {item.product_name}
-          {item.product_size ? ` (${item.product_size})` : ""}
-        </td>
-       <td className="text-center">
-  <span className="print:hidden">
-    <input
-      type="number"
-      min={0}
-      value={returns[item.id]?.qty ?? 0}
-      onChange={(e) => {
-        const val = e.target.value === "" ? 0 : Number(e.target.value);
+          <table className="w-full border-collapse sj-table mt-2">
+            <thead>
+              <tr>
+                <th className="text-left">Retur Barang</th>
+                <th className="text-center w-20">PCS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.delivery_items.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    {item.product_name}
+                    {item.product_size ? ` (${item.product_size})` : ""}
+                  </td>
+                  <td className="text-center">
+                    <span className="print:hidden">
+                      <input
+                        type="number"
+                        min={0}
+                        value={returns[item.id]?.qty ?? 0}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? 0 : Number(e.target.value);
 
-        setReturns((prev) => ({
-          ...prev,
-          [item.id]: {
-            ...prev[item.id],
-            qty: val,
-          },
-        }));
-      }}
-      className="w-16 border text-center"
-    />
-  </span>
+                          setReturns((prev) => ({
+                            ...prev,
+                            [item.id]: {
+                              ...prev[item.id],
+                              qty: val,
+                            },
+                          }));
+                        }}
+                        className="w-16 border text-center"
+                      />
+                    </span>
 
-  <span className="hidden print:inline">
-    {returns[item.id]?.qty ?? 0}
-  </span>
-</td>
-
-      </tr>
-    ))}
-  </tbody>
-</table>
-
+                    <span className="hidden print:inline">
+                      {returns[item.id]?.qty ?? 0}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         <div className="grid grid-cols-3 gap-6 mb-4">
-<div>
-  <label className="block font-semibold mb-1">No Gudang</label>
+          <div>
+            <label className="block font-semibold mb-1">No Gudang</label>
 
-  <div className="print:hidden">
-    <input
-      type="text"
-      value={noGudang}
-      onChange={(e) => setNoGudang(e.target.value)}
-      className="w-full border border-gray-300 rounded px-3 py-2"
-    />
-  </div>
+            <div className="print:hidden">
+              <input
+                type="text"
+                value={noGudang}
+                onChange={(e) => setNoGudang(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2"
+              />
+            </div>
 
-  <div className="hidden print:block border-b border-gray-300 py-1">
-    {noGudang || "-"}
-  </div>
-</div>
-
+            <div className="hidden print:block border-b border-gray-300 py-1">
+              {noGudang || "-"}
+            </div>
+          </div>
 
           <div>
             <label className="block font-semibold mb-1">Supir</label>
@@ -463,133 +502,110 @@ const handleDownloadPdf = async () => {
         <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t-2 border-gray-300">
           <div className="text-center">
             <p className="font-semibold mb-7">Tanda Terima</p>
-           
-              {/* <p className="text-sm">(................)</p> */}
-          
           </div>
           
           <div className="text-center">
             <p className="font-semibold mb-7">Supir</p>
-           
-              {/* <p className="text-sm">
-                ({drivers.find(d => d.id === driverId)?.name || "................"})
-              </p> */}
-            
           </div>
           
           <div className="text-center">
             <p className="font-semibold mb-7">Dibuat Oleh</p>
-            
-              {/* <p className="text-sm">(................)</p> */}
-            
           </div>
           
           <div className="text-center">
             <p className="font-semibold mb-7">Security</p>
-          
-              {/* <p className="text-sm">(................)</p> */}
-           
           </div>
         </div>
       </div>
 
-<style jsx global>{`
- @media print {
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 6mm 6mm;
+          }
 
-  @page {
-    size: A4 portrait;
-    margin: 6mm 6mm;
-  }
+          body {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 12pt !important;
+            font-weight: 700 !important;
+            color: #000 !important;
+            -webkit-font-smoothing: none !important;
+            -moz-osx-font-smoothing: auto !important;
+            text-rendering: optimizeSpeed !important;
+          }
 
-  /* ================= FORCE READABLE ================= */
-  body {
-    font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 12pt !important;
-    font-weight: 700 !important;
-    color: #000 !important;
+          body * {
+            visibility: hidden;
+            color: #000 !important;
+          }
 
-    -webkit-font-smoothing: none !important;
-    -moz-osx-font-smoothing: auto !important;
-    text-rendering: optimizeSpeed !important;
-  }
+          #print-content,
+          #print-content * {
+            visibility: visible !important;
+            color: #000 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            filter: none !important;
+          }
 
-  body * {
-    visibility: hidden;
-    color: #000 !important;
-  }
+          #print-content {
+            position: absolute;
+            inset: 0;
+            padding: 0 !important;
+            margin: 0 !important;
+            font-size: 12pt !important;
+            line-height: 1.15 !important;
+          }
 
-  #print-content,
-  #print-content * {
-    visibility: visible !important;
-    color: #000 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    filter: none !important;
-  }
+          #print-content h1 {
+            font-size: 16pt !important;
+            font-weight: 800 !important;
+            margin: 0 0 4pt 0 !important;
+            padding-bottom: 4pt !important;
+            border-bottom: 1.2pt solid #000 !important;
+          }
 
-  #print-content {
-    position: absolute;
-    inset: 0;
-    padding: 0 !important;
-    margin: 0 !important;
-    font-size: 12pt !important;
-    line-height: 1.15 !important;
-  }
+          #print-content span,
+          #print-content p,
+          #print-content td,
+          #print-content th {
+            font-weight: 700 !important;
+            color: #000 !important;
+          }
 
-  /* ================= HEADER ================= */
-  #print-content h1 {
-    font-size: 16pt !important;
-    font-weight: 800 !important;
-    margin: 0 0 4pt 0 !important;
-    padding-bottom: 4pt !important;
-    border-bottom: 1.2pt solid #000 !important;
-  }
+          .sj-table {
+            width: 100%;
+            border-collapse: collapse !important;
+            border: 1.2pt solid #000 !important;
+            font-size: 11.8pt !important;
+          }
 
-  /* ================= TEXT ================= */
-  #print-content span,
-  #print-content p,
-  #print-content td,
-  #print-content th {
-    font-weight: 700 !important;
-    color: #000 !important;
-  }
+          .sj-table th,
+          .sj-table td {
+            border: 1pt solid #000 !important;
+            padding: 3pt 4pt !important;
+            vertical-align: middle !important;
+          }
 
-  /* ================= TABLE ================= */
-  .sj-table {
-    width: 100%;
-    border-collapse: collapse !important;
-    border: 1.2pt solid #000 !important;
-    font-size: 11.8pt !important;
-  }
+          .sj-table th {
+            font-weight: 800 !important;
+            text-align: center;
+          }
 
-  .sj-table th,
-  .sj-table td {
-    border: 1pt solid #000 !important;
-    padding: 3pt 4pt !important;
-    vertical-align: middle !important;
-  }
+          .print\\:hidden {
+            display: none !important;
+          }
 
-  .sj-table th {
-    font-weight: 800 !important;
-    text-align: center;
-  }
+          .print\\:inline {
+            display: inline !important;
+          }
 
-  /* ================= PRINT UTILS ================= */
-  .print\:hidden {
-    display: none !important;
-  }
-
-  .print\:inline {
-    display: inline !important;
-  }
-
-  .print\:block {
-    display: block !important;
-  }
-}
-`}</style>
-
-
+          .print\\:block {
+            display: block !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

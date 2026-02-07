@@ -46,6 +46,7 @@ export default function SalesOrderDetailPage() {
           harga_m3: i.price_per_m3 ?? 0,
           kubik_m3: i.products?.kubik_m3 ?? 0,
           isi_palet: i.total_pcs && i.pallet_qty ? i.total_pcs / i.pallet_qty : 0,
+          total_m3: (i.products?.kubik_m3 ?? 0) * (i.pallet_qty ?? 0),
           palet: i.pallet_qty ?? 0,
           pcs: i.total_pcs ?? 0,
           harga_satuan: i.total_pcs > 0 ? i.total_price / i.total_pcs : 0,
@@ -131,7 +132,7 @@ export default function SalesOrderDetailPage() {
                 <td className="py-2">{i.product_name}</td>
                 <td className="text-right py-2">Rp {i.harga_m3.toLocaleString()}</td>
                 <td className="text-center py-2">{i.isi_palet}</td>
-                <td className="text-center py-2">{i.kubik_m3} m³</td>
+                <td className="text-center py-2">{i.total_m3} m³</td>
                 <td className="text-center py-2">{i.palet}</td>
                 <td className="text-center py-2">{i.pcs}</td>
                 <td className="text-right py-2">

@@ -208,38 +208,65 @@ useEffect(() => {
   /* ======================
      UPDATE ITEM (PCS AUTO)
   ====================== */
-  const updateItem = (idx: number, field: string, value: any) => {
+//   const updateItem = (idx: number, field: string, value: any) => {
+//   const copy = [...items];
+//   // @ts-ignore
+//   copy[idx][field] = value;
+
+//   const qtyPalet = Number(copy[idx].qty_pallet) || 0;
+//   const isiPerPalet = Number(copy[idx].pallet_size) || 0;
+//   const m3 = Number(copy[idx].m3) || 0;
+//   const priceM3 = Number(copy[idx].price_m3) || 0;
+
+  
+
+
+//   // 1️⃣ PCS
+//   const qtyPcs = qtyPalet * isiPerPalet;
+//   copy[idx].qty_pcs = qtyPcs;
+
+// // 2️⃣ Harga satuan PCS (KONSTAN)
+// const unitPrice = priceM3 * m3/ qtyPcs;
+// copy[idx].unit_price = unitPrice;
+
+// // 3️⃣ Total harga (YANG BERUBAH)
+// copy[idx].total =  qtyPcs * unitPrice;
+
+
+// setItems(copy);
+// };
+
+
+  const grandTotal = items.reduce((s, i) => s + i.total, 0);
+
+const updateItem = (idx: number, field: string, value: any) => {
   const copy = [...items];
   // @ts-ignore
   copy[idx][field] = value;
 
   const qtyPalet = Number(copy[idx].qty_pallet) || 0;
   const isiPerPalet = Number(copy[idx].pallet_size) || 0;
-  const m3 = Number(copy[idx].m3) || 0;
   const priceM3 = Number(copy[idx].price_m3) || 0;
 
-  
-
+  // 🔥 M³ HARUS DINAMIS (1.8 × jumlah palet)
+  const m3PerPallet = 1.8; // Konstanta
+  const totalM3 = m3PerPallet * qtyPalet;
+  copy[idx].m3 = totalM3;
 
   // 1️⃣ PCS
   const qtyPcs = qtyPalet * isiPerPalet;
   copy[idx].qty_pcs = qtyPcs;
 
-// 2️⃣ Harga satuan PCS (KONSTAN)
-const unitPrice = priceM3 * m3/ qtyPcs;
-copy[idx].unit_price = unitPrice;
+  // 2️⃣ Harga satuan PCS
+  // Formula: (Harga/m³ × Total M³) / Total PCS
+  const unitPrice = qtyPcs > 0 ? (priceM3 * totalM3) / qtyPcs : 0;
+  copy[idx].unit_price = unitPrice;
 
-// 3️⃣ Total harga (YANG BERUBAH)
-copy[idx].total =  qtyPcs * unitPrice;
+  // 3️⃣ Total harga
+  copy[idx].total = priceM3 * totalM3;
 
-
-setItems(copy);
+  setItems(copy);
 };
-
-
-  const grandTotal = items.reduce((s, i) => s + i.total, 0);
-
-
 
 
 
@@ -269,6 +296,7 @@ setItems(copy);
 
   const payload = {
     customer_id: selectedSupplierId,
+    order_date: date,
     ship_to_name: form.to || null,
     contact_phone: form.phone || null,
     delivery_address: form.address || null,

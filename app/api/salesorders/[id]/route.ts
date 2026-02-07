@@ -119,6 +119,7 @@ export async function PATCH(
     const { error: soError } = await supabase
       .from("sales_orders")
       .update({
+        order_date: body.order_date,
         customer_order_ref: body.customer_order_ref,
         ship_to_name: body.ship_to_name,
         contact_phone: body.contact_phone,
