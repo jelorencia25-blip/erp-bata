@@ -24,12 +24,13 @@ export async function GET() {
         sales_order_items (
           total_pcs,
           pallet_qty,
+          total_m3,
           products (
-            ukuran,
-            kubik_m3
+            ukuran
           )
         )
       ),
+      delivery_return_items ( return_pcs ),
       staff:staff!delivery_orders_driver_id_fkey ( name ),
       vehicles ( plate_number )
     `)
@@ -37,31 +38,36 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (error) {
+    console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // 🔥 FILTER CANCELLED DI MAPPING
   const result = (data ?? [])
-    .filter((d: any) => d.sales_orders?.status !== "cancelled")  // 🔥 FILTER
+    .filter((d: any) => d.sales_orders?.status !== "cancelled")
     .map((d: any) => {
       const so = d.sales_orders;
 
       let totalPcs = 0;
       let totalPalet = 0;
-      const ukuranSet = new Set<string>();
-      const kubikSet = new Set<string>();
+      let totalM3 = 0;
+      let totalReturn = 0;
 
+      const ukuranSet = new Set<string>();
+
+      // SALES ORDER ITEMS
       for (const item of so?.sales_order_items ?? []) {
         totalPcs += Number(item.total_pcs || 0);
         totalPalet += Number(item.pallet_qty || 0);
+        totalM3 += Number(item.total_m3 || 0);
 
         if (item.products?.ukuran) {
           ukuranSet.add(item.products.ukuran);
         }
+      }
 
-        if (item.products?.kubik_m3 != null) {
-          kubikSet.add(String(item.products.kubik_m3));
-        }
+      // DELIVERY RETURNS
+      for (const r of d.delivery_return_items ?? []) {
+        totalReturn += Number(r.return_pcs || 0);
       }
 
       return {
@@ -74,11 +80,12 @@ export async function GET() {
         alamat: so?.delivery_address ?? "-",
         ukuran: Array.from(ukuranSet).join(", "),
         total_pcs: totalPcs,
+        return_pcs: totalReturn,
         palet: totalPalet,
-        kubik_m3: Array.from(kubikSet).join(", "),
+        total_m3: totalM3,
         supir: d.staff?.name ?? "-",
         plat_mobil: d.vehicles?.plate_number ?? "-",
-        so_status: so?.status,  // 🔥 INCLUDE STATUS
+        so_status: so?.status,
       };
     });
 

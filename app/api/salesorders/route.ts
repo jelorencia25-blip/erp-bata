@@ -13,6 +13,7 @@ export async function GET() {
   );
 
   try {
+    // 1️⃣ Ambil Sales Orders (tetap seperti sekarang)
     const { data, error } = await supabase
       .from("sales_orders")
       .select(`
@@ -24,11 +25,37 @@ export async function GET() {
 
     if (error) throw error;
 
-    // Transform untuk flatten nested objects
+    // 2️⃣ Ambil semua SJ berdasarkan sales_order_id
+    const soIds = data.map((so: any) => so.id);
+
+    let sjMap: Record<string, string[]> = {};
+
+    if (soIds.length > 0) {
+      const { data: deliveries, error: deliveryError } = await supabase
+        .from("delivery_orders")
+        .select("sales_order_id, sj_number")
+        .in("sales_order_id", soIds);
+
+      if (deliveryError) throw deliveryError;
+
+      deliveries?.forEach((d: any) => {
+        if (!sjMap[d.sales_order_id]) {
+          sjMap[d.sales_order_id] = [];
+        }
+        sjMap[d.sales_order_id].push(d.sj_number);
+      });
+    }
+
+    // 3️⃣ Transform + merge SJ
     const transformed = data.map((so: any) => ({
       ...so,
       customer_name: so.customers?.[0]?.name || '-',
       deposit_code: so.deposits?.[0]?.deposit_code || '-',
+
+      // 🔥 TAMBAHAN SJ
+      sj_numbers: sjMap[so.id]
+        ? [...new Set(sjMap[so.id])].join(', ')
+        : '-'
     }));
 
     return NextResponse.json(transformed);
@@ -38,6 +65,7 @@ export async function GET() {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
 
 // =============================================
 // POST - CREATE SALES ORDER

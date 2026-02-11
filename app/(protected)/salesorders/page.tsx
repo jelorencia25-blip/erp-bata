@@ -17,6 +17,7 @@ type SalesOrder = {
   total_price: number | null;
   purchase_type: string | null;
   status: string | null;
+  sj_numbers?: string;
 };
 
 const ROW_STATUS_CLASS: Record<string, string> = {
@@ -166,6 +167,7 @@ export default function SalesOrdersPage() {
   const columns: { key: keyof SalesOrder; label: string; align?: string }[] = [
     { key: 'order_date', label: 'Tgl Order' },
     { key: 'so_number', label: 'No SO' },
+    { key: 'sj_numbers', label: 'SJ' },
     { key: 'customer_order_ref', label: 'Order Ref' },
     { key: 'customer_name', label: 'Supplier' },
     { key: 'ship_to_name', label: 'Kepada' },
@@ -334,8 +336,9 @@ export default function SalesOrdersPage() {
                   
                   <td className="p-3">{o.order_date ? new Date(o.order_date).toLocaleDateString('id-ID') : '-'}</td>
                   <td className="p-3 font-medium">{o.so_number ?? '-'}</td>
-                  <td className="p-3">{o.customer_order_ref ?? '-'}</td>
+                  <td className="p-3">{o.sj_numbers ?? '-'}</td>
                   <td className="p-3">{o.customer_name ?? '-'}</td>
+                  <td className="p-3">{o.customer_order_ref ?? '-'}</td>
                   <td className="p-3">{o.ship_to_name ?? '-'}</td>
                   <td className="p-3 text-right">{o.total_pcs?.toLocaleString() ?? 0}</td>
                   <td className="p-3">{o.uk ?? '-'}</td>

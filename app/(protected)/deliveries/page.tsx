@@ -13,7 +13,8 @@ type Row = {
   ukuran: string;
   total_pcs: number;
   palet: number;
-  kubik_m3?: number | string;
+  total_m3: number;
+  return_pcs?: number;
   supir: string;
   plat_mobil: string;
   final_status: "draft" | "final";
@@ -215,7 +216,8 @@ export default function DeliveriesPage() {
               <SortTh label="Uk" col="ukuran" align="center" />
               <SortTh label="PCS" col="total_pcs" align="right" />
               <SortTh label="Palet" col="palet" align="center" />
-              <SortTh label="Kubik" col="kubik_m3" align="right" />
+              <SortTh label="M3" col="total_m3" align="right" />
+              <SortTh label="Return PCS" col="return_pcs" align="right" />
               <SortTh label="Supir" col="supir" />
               <SortTh label="Plat" col="plat_mobil" />
               <th className="p-3"></th>
@@ -267,7 +269,16 @@ export default function DeliveriesPage() {
                   {row.total_pcs.toLocaleString()}
                 </td>
                 <td className="p-3 text-center">{row.palet}</td>
-                <td className="p-3 text-right">{row.kubik_m3 ?? "-"}</td>
+               <td className="p-3 text-right">
+  {row.total_m3?.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}
+</td>
+<td className="p-3 text-right">
+  {row.return_pcs ?? 0}
+</td>
+
                 <td className="p-3">{row.supir}</td>
                 <td className="p-3">{row.plat_mobil}</td>
 

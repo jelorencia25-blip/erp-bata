@@ -315,7 +315,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
       <div id="print-content" className="bg-white p-10 rounded shadow">
         <div className="text-center border-b-2 border-gray-300 pb-3 mb-4">
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-normal">
             Surat Jalan – {data.sj_number} - GUDANG BEKASI
           </h1>
         </div>
@@ -323,38 +323,38 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
         <div className="grid grid-cols-2 gap-x-8 gap-y-1 mb-4">
           <div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Nomor SO</span>
+              <span className="font-normal w-36">Nomor SO</span>
               <span className="flex-1">{data.so_number}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Supplier</span>
+              <span className="font-normal w-36">Supplier</span>
               <span className="flex-1">{data.customer_name}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Purchase Type</span>
+              <span className="font-normal w-36">Purchase Type</span>
               <span className="flex-1">{data.purchase_type}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Telp</span>
+              <span className="font-normal w-36">Telp</span>
               <span className="flex-1">{data.contact_phone || "-"}</span>
             </div>
           </div>
 
           <div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Tanggal SO</span>
+              <span className="font-normal w-36">Tanggal SO</span>
               <span className="flex-1">{data.order_date}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">No Ref</span>
+              <span className="font-normal w-36">No Ref</span>
               <span className="flex-1">{data.customer_order_ref}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Kepada</span>
+              <span className="font-normal w-36">Kepada</span>
               <span className="flex-1">{data.ship_to_name || "-"}</span>
             </div>
             <div className="flex border-b border-gray-200 py-1">
-              <span className="font-semibold w-36">Catatan</span>
+              <span className="font-normal w-36">Catatan</span>
               <span className="flex-1">{data.notes || "-"}</span>
             </div>
           </div>
@@ -362,7 +362,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
         <div className="mb-3">
           <div className="flex border-b border-gray-200 py-1">
-            <span className="font-semibold w-24">Alamat</span>
+            <span className="font-normal w-24">Alamat</span>
             <span className="flex-1">{data.delivery_address || "-"}</span>
           </div>
         </div>
@@ -447,7 +447,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
         <div className="grid grid-cols-3 gap-6 mb-4">
           <div>
-            <label className="block font-semibold mb-1">No Gudang</label>
+            <label className="block font-normal mb-1">No Gudang</label>
 
             <div className="print:hidden">
               <input
@@ -464,7 +464,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           </div>
 
           <div>
-            <label className="block font-semibold mb-1">Supir</label>
+            <label className="block font-normal mb-1">Supir</label>
             <div className="print:hidden">
               <select 
                 value={driverId} 
@@ -483,7 +483,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           </div>
 
           <div>
-            <label className="block font-semibold mb-1">Plat Mobil</label>
+            <label className="block font-normal mb-1">Plat Mobil</label>
             <div className="print:hidden">
               <select 
                 value={vehicleId} 
@@ -504,19 +504,19 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
         <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t-2 border-gray-300">
           <div className="text-center">
-            <p className="font-semibold mb-7">Tanda Terima</p>
+            <p className="font-normal mb-7">Tanda Terima</p>
           </div>
           
           <div className="text-center">
-            <p className="font-semibold mb-7">Supir</p>
+            <p className="font-normal mb-7">Supir</p>
           </div>
           
           <div className="text-center">
-            <p className="font-semibold mb-7">Dibuat Oleh</p>
+            <p className="font-normal mb-7">Dibuat Oleh</p>
           </div>
           
           <div className="text-center">
-            <p className="font-semibold mb-7">Security</p>
+            <p className="font-normal mb-7">Security</p>
           </div>
         </div>
       </div>
@@ -531,7 +531,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           body {
             font-family: Arial, Helvetica, sans-serif !important;
             font-size: 12pt !important;
-            font-weight: 700 !important;
+            font-weight: 300 !important;
             color: #000 !important;
             -webkit-font-smoothing: none !important;
             -moz-osx-font-smoothing: auto !important;
@@ -563,7 +563,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
           #print-content h1 {
             font-size: 16pt !important;
-            font-weight: 800 !important;
+            font-weight: 300 !important;
             margin: 0 0 4pt 0 !important;
             padding-bottom: 4pt !important;
             border-bottom: 1.2pt solid #000 !important;
@@ -573,7 +573,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           #print-content p,
           #print-content td,
           #print-content th {
-            font-weight: 700 !important;
+            font-weight: 300 !important;
             color: #000 !important;
           }
 

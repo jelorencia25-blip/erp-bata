@@ -18,7 +18,7 @@ export async function GET(
   );
 
   try {
-    // Fetch SO data
+    // Fetch SO data with proper joins
     const { data, error } = await supabase
       .from("sales_orders")
       .select(`
@@ -60,12 +60,22 @@ export async function GET(
       .eq("id", id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("GET SO ERROR:", error);
+      throw error;
+    }
 
-    // 🔥 Fetch deposit info separately (bukan via deposit_usages)
+    if (!data) {
+      return NextResponse.json(
+        { error: "Sales Order not found" },
+        { status: 404 }
+      );
+    }
+
+    // 🔥 Fetch deposit info separately
     let depositInfo = null;
     if (data?.deposit_id) {
-      const { data: deposit } = await supabase
+      const { data: deposit, error: depositError } = await supabase
         .from("deposits")
         .select(`
           id,
@@ -78,18 +88,20 @@ export async function GET(
         .eq("id", data.deposit_id)
         .single();
       
-      depositInfo = deposit;
+      if (!depositError) {
+        depositInfo = deposit;
+      }
     }
 
     return NextResponse.json({
       ...data,
-      deposit: depositInfo  // 🔥 Add deposit as separate field
+      deposit: depositInfo
     });
 
   } catch (err: any) {
     console.error("GET SO ERROR:", err);
     return NextResponse.json({ 
-      error: err.message,
+      error: err.message || "Failed to fetch Sales Order",
       details: err.details,
       hint: err.hint 
     }, { status: 500 });
@@ -115,6 +127,14 @@ export async function PATCH(
 
     console.log("UPDATE SO PAYLOAD:", body);
 
+    // ✅ Validate required fields
+    if (!body.items || body.items.length === 0) {
+      return NextResponse.json(
+        { error: "Items cannot be empty" },
+        { status: 400 }
+      );
+    }
+
     // 1️⃣ Update Sales Order header
     const { error: soError } = await supabase
       .from("sales_orders")
@@ -126,48 +146,59 @@ export async function PATCH(
         delivery_address: body.delivery_address,
         purchase_type: body.purchase_type,
         notes: body.notes,
-        deposit_id: body.deposit_id || null,  // Update deposit reference
+        deposit_id: body.deposit_id || null,
       })
       .eq("id", id);
 
-    if (soError) throw soError;
+    if (soError) {
+      console.error("SO UPDATE ERROR:", soError);
+      throw soError;
+    }
 
-    // 2️⃣ Delete existing items
+    // 2️⃣ Delete existing items (cascade safe)
     const { error: deleteItemsError } = await supabase
       .from("sales_order_items")
       .delete()
       .eq("sales_order_id", id);
 
-    if (deleteItemsError) throw deleteItemsError;
-
-    // 3️⃣ Insert new items
-    if (body.items && body.items.length > 0) {
-      const itemsPayload = body.items.map((i: any) => ({
-        sales_order_id: id,
-        product_id: i.product_id,
-        pallet_qty: Number(i.pallet_qty),
-        total_pcs: Number(i.total_pcs),
-        price_per_m3: Number(i.price_per_m3),
-        total_m3: Number(i.total_m3),
-        total_price: Number(i.total_price),
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("sales_order_items")
-        .insert(itemsPayload);
-
-      if (itemsError) throw itemsError;
+    if (deleteItemsError) {
+      console.error("DELETE ITEMS ERROR:", deleteItemsError);
+      throw deleteItemsError;
     }
 
-    // ✅ DEPOSIT LOGIC REMOVED
-    // Deposit will be deducted automatically when invoice is finalized via trigger
-    // No manual insert to deposit_usages here
+    // 3️⃣ Insert new items
+    const itemsPayload = body.items.map((i: any) => ({
+      sales_order_id: id,
+      product_id: i.product_id,
+      pallet_qty: Number(i.pallet_qty) || 0,
+      total_pcs: Number(i.total_pcs) || 0,
+      price_per_m3: Number(i.price_per_m3) || 0,
+      total_m3: Number(i.total_m3) || 0,
+      total_price: Number(i.total_price) || 0,
+    }));
 
-    return NextResponse.json({ success: true });
+    const { error: itemsError } = await supabase
+      .from("sales_order_items")
+      .insert(itemsPayload);
+
+    if (itemsError) {
+      console.error("INSERT ITEMS ERROR:", itemsError);
+      throw itemsError;
+    }
+
+    // ✅ Return success
+    return NextResponse.json({ 
+      success: true,
+      message: "Sales Order updated successfully" 
+    });
 
   } catch (err: any) {
     console.error("UPDATE SO ERROR:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: err.message || "Failed to update Sales Order",
+      details: err.details,
+      hint: err.hint
+    }, { status: 500 });
   }
 }
 
@@ -186,14 +217,17 @@ export async function DELETE(
   );
 
   try {
-    // Check if SO has delivery orders
+    // ✅ Check if SO has delivery orders
     const { data: deliveries, error: checkError } = await supabase
       .from("delivery_orders")
       .select("id")
       .eq("sales_order_id", id)
       .limit(1);
 
-    if (checkError) throw checkError;
+    if (checkError) {
+      console.error("CHECK DELIVERY ERROR:", checkError);
+      throw checkError;
+    }
 
     if (deliveries && deliveries.length > 0) {
       return NextResponse.json(
@@ -202,18 +236,47 @@ export async function DELETE(
       );
     }
 
-    // Delete SO (items will cascade delete)
+    // ✅ Check if SO is used in invoices
+    const { data: invoices, error: invoiceCheckError } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("sales_order_id", id)
+      .limit(1);
+
+    if (invoiceCheckError) {
+      console.error("CHECK INVOICE ERROR:", invoiceCheckError);
+      throw invoiceCheckError;
+    }
+
+    if (invoices && invoices.length > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete Sales Order with existing Invoices" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Delete SO (items will cascade delete via DB constraint)
     const { error: deleteError } = await supabase
       .from("sales_orders")
       .delete()
       .eq("id", id);
 
-    if (deleteError) throw deleteError;
+    if (deleteError) {
+      console.error("DELETE SO ERROR:", deleteError);
+      throw deleteError;
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      message: "Sales Order deleted successfully" 
+    });
 
   } catch (err: any) {
     console.error("DELETE SO ERROR:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: err.message || "Failed to delete Sales Order",
+      details: err.details,
+      hint: err.hint
+    }, { status: 500 });
   }
 }

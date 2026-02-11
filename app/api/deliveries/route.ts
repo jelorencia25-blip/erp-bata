@@ -23,9 +23,9 @@ const supabase = createClient(
 
     console.log("📥 Request body:", { sales_order_id, vehicle_id, driver_id, returns });
 
-    if (!sales_order_id || !vehicle_id || !driver_id) {
-      return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
-    }
+   if (!sales_order_id) {
+  return NextResponse.json({ error: "Sales Order wajib diisi" }, { status: 400 });
+}
 
     // 🔹 1. Cek apakah SJ sudah ada untuk SO ini
     const { data: existingDelivery } = await supabase

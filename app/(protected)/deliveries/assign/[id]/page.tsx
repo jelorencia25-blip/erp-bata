@@ -64,10 +64,10 @@ export default function AssignDeliveryPage() {
   }, [id]);
 
   const handleSave = async () => {
-  if (!vehicleId || !driverId) {
-    alert("Pilih supir & mobil dulu");
-    return;
-  }
+  // if (!vehicleId || !driverId) {
+  //   alert("Pilih supir & mobil dulu");
+  //   return;
+  // }
 
   if (!so) return;
 
@@ -78,8 +78,8 @@ export default function AssignDeliveryPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sales_order_id: id,
-        vehicle_id: vehicleId,
-        driver_id: driverId,
+        vehicle_id: vehicleId || null,
+        driver_id: driverId || null,
         returns,
       }),
     });

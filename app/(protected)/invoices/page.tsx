@@ -7,6 +7,8 @@ type InvoiceRow = {
   id: string;
   sj_number: string;
   delivery_date: string;
+  sudah_tagih: boolean;
+  sudah_bayar: boolean;
   sales_order?: {
     customer?: {
       name: string;
@@ -33,6 +35,25 @@ export default function InvoicesPage() {
         setLoading(false);
       });
   }, []);
+
+  const updateCheckbox = async (
+  id: string,
+  field: "sudah_tagih" | "sudah_bayar",
+  value: boolean
+) => {
+  setRows(prev =>
+    prev.map(r =>
+      r.id === id ? { ...r, [field]: value } : r
+    )
+  );
+
+  await fetch(`/api/delivery-status/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ [field]: value }),
+  });
+};
+
 
   /* ================= FILTER ================= */
   const filteredRows = useMemo(() => {
@@ -115,12 +136,17 @@ export default function InvoicesPage() {
   </button>
 </div>
 
+<div className="text-sm text-red-600 font-semibold">
+  ⚠ Jangan lupa update di payment
+</div>
+
+
       {/* TABLE */}
       <div className="overflow-x-auto bg-white rounded-lg shadow">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {["No", "No SJ", "Supplier", "Tanggal", "Action"].map((h) => (
+              {["No", "No SJ", "Supplier", "Tanggal", "Sudah Tagih", "Sudah Bayar", "Action"].map((h) => (
                 <th key={h} className="p-3 text-left">
                   {h}
                 </th>
@@ -151,6 +177,27 @@ export default function InvoicesPage() {
                       ? new Date(r.delivery_date).toLocaleDateString("id-ID")
                       : "-"}
                   </td>
+                  <td className="p-3 text-center">
+  <input
+    type="checkbox"
+    checked={!!r.sudah_tagih}
+
+    onChange={(e) =>
+      updateCheckbox(r.id, "sudah_tagih", e.target.checked)
+    }
+  />
+</td>
+
+<td className="p-3 text-center">
+  <input
+    type="checkbox"
+    checked={!!r.sudah_bayar}
+    onChange={(e) =>
+      updateCheckbox(r.id, "sudah_bayar", e.target.checked)
+    }
+  />
+</td>
+
                   <td className="p-3">
                     <button
                       onClick={() => router.push(`/invoices/${r.id}`)}

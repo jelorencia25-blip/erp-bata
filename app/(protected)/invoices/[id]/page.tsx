@@ -358,9 +358,7 @@ export default function InvoiceDetailPage() {
             {/* Signature - Flex grow to push to bottom */}
             <div className="text-center mt-auto pt-8">
               <div className="mb-12 font-semibold">Diterima oleh,</div>
-              <div className="border-t border-black inline-block min-w-50 pt-1">
-                (Nama & Tanda Tangan)
-              </div>
+          
             </div>
           </div>
 
@@ -391,9 +389,6 @@ export default function InvoiceDetailPage() {
             {/* Signature - Flex grow to push to bottom */}
             <div className="text-center mt-auto pt-8">
               <div className="mb-12 font-semibold">Hormat kami,</div>
-              <div className="border-t border-black inline-block min-w-50 pt-1">
-                (Nama & Tanda Tangan)
-              </div>
             </div>
           </div>
         </div>
@@ -424,7 +419,7 @@ export default function InvoiceDetailPage() {
   #print-content * {
     visibility: visible;
     color: #000 !important; /* force pitch black */
-    font-weight: 700 !important; /* max bold */
+    font-weight: 300 !important; /* max bold */
   }
 
   #print-content {
@@ -442,7 +437,7 @@ export default function InvoiceDetailPage() {
   /* ================= TITLE ================= */
   #print-content .text-2xl {
     font-size: 16pt !important;
-    font-weight: 700 !important;
+    font-weight: 300 !important;
     margin-bottom: 6pt !important;
     color: #000 !important;
   }
@@ -453,7 +448,7 @@ export default function InvoiceDetailPage() {
   }
 
   #print-content .font-bold {
-    font-weight: 700 !important;
+    font-weight: 300 !important;
     color: #000 !important;
   }
 
@@ -474,7 +469,7 @@ export default function InvoiceDetailPage() {
     padding: 3pt 4pt !important;
     vertical-align: middle !important;
     color: #000 !important;
-    font-weight: 700 !important;
+    font-weight: 300 !important;
     background: #fff !important;
   }
 
@@ -489,12 +484,12 @@ export default function InvoiceDetailPage() {
   /* ================= TERBILANG ================= */
   #print-content .italic {
     font-style: italic !important;
-    font-weight: 700 !important; /* still normal for terbilang */
+    font-weight: 300 !important; /* still normal for terbilang */
     color: #000 !important;
   }
 
   #print-content .italic .font-bold {
-    font-weight: 700 !important;
+    font-weight: 300 !important;
   }
 
   /* ================= TOTAL ================= */
@@ -502,13 +497,13 @@ export default function InvoiceDetailPage() {
     border: 1.5pt solid #000 !important;
     background: #fff !important;
     color: #000 !important;
-    font-weight: 700 !important;
+    font-weight: 300 !important;
   }
 
   /* ================= REKENING TRANSFER ================= */
   #print-content .rekening-transfer {
     font-size: 10pt !important;
-    font-weight: 700 !important;
+    font-weight: 300 !important;
     line-height: 1 !important;
     white-space: normal !important;
     word-break: break-word !important;

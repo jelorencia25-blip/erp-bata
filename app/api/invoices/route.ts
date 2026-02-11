@@ -22,6 +22,8 @@ const supabase = createClient(
         id,
         sj_number,
         delivery_date,
+        sudah_tagih,
+        sudah_bayar,
         status,
         sales_order:sales_orders (
           id,
