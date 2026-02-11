@@ -62,7 +62,7 @@ export async function GET(
 
     const { data: deliveryItems, error: itemsError } = await supabase
       .from("delivery_items")
-      .select("id, product_id, pallet_qty, total_pcs, kubik_m3")
+      .select("id, product_id, pallet_qty,total_pcs, kubik_m3")
       .eq("delivery_order_id", id);
 
     if (itemsError) throw itemsError;
@@ -77,6 +77,11 @@ export async function GET(
       .select("so_number, customer_id, customer_order_ref, ship_to_name, contact_phone, delivery_address, notes, purchase_type")
       .eq("id", delivery.sales_order_id)
       .single();
+
+          const { data: salesOrderItems } = await supabase
+      .from("sales_order_items")
+      .select("id, product_id, total_m3")
+      .eq("sales_order_id", delivery.sales_order_id);
 
     let customerName = "-";
     if (salesOrder?.customer_id) {
@@ -100,16 +105,23 @@ export async function GET(
           (r) => r.product_id === item.product_id
         );
 
+           const soItem = salesOrderItems?.find(
+          (si) => si.product_id === item.product_id
+        );
+
         return {
           ...item,
           product_name: product?.name ?? "-",
           product_size: product?.ukuran ?? "-",
           isi_per_palet: product?.isi_per_palet ?? 0,
           return_pcs: returnItem?.return_pcs ?? 0,
-          kubik_m3: product?.kubik_m3 ?? 0,
+          kubik_m3: soItem?.total_m3 ?? 0,
         };
       })
     );
+
+
+    
 
     const enrichedReturns = await Promise.all(
       (returnItems || []).map(async (item) => {

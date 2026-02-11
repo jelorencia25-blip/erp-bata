@@ -16,6 +16,7 @@ type DeliveryItem = {
   product_name: string;
   product_size: string;
   isi_per_palet: number;
+  kubik_m3: number;
   return_pcs: number;
 };
 
@@ -315,7 +316,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
       <div id="print-content" className="bg-white p-10 rounded shadow">
         <div className="text-center border-b-2 border-gray-300 pb-3 mb-4">
           <h1 className="text-2xl font-bold">
-            Surat Jalan – {data.sj_number}
+            Surat Jalan – {data.sj_number} - GUDANG BEKASI
           </h1>
         </div>
 
@@ -373,6 +374,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
                 <th className="text-center w-8">No</th>
                 <th className="text-left">Barang / Ukuran</th>
                 <th className="text-center w-20">Isi / Palet</th>
+                <th className="text-center w-20">M3</th>
                 <th className="text-center w-16">Palet</th>
                 <th className="text-center w-20">PCS</th>
               </tr>
@@ -388,6 +390,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
                   <td className="text-center">
                     {item.isi_per_palet || "-"}
                   </td>
+                   <td className="text-center py-2">{item.kubik_m3} m³</td>
                   <td className="text-center">{item.pallet_qty}</td>
                   <td className="text-center">{item.total_pcs}</td>
                 </tr>

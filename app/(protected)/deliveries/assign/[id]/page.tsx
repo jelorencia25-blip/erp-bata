@@ -193,8 +193,8 @@ export default function AssignDeliveryPage() {
 
       {/* Kubik M3 */}
       <td className="text-center">
-        {i.products?.kubik_m3
-          ? `${i.products.kubik_m3} m³`
+        {i.total_m3
+          ? `${i.total_m3} m³`
           : "-"}
       </td>
     </tr>
