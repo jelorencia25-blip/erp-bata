@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type PaymentRow = {
   no: number;
+  so_number: string;
   delivery_order_id: string;
   no_sj: string;
   tgl: string | null;
@@ -135,7 +136,7 @@ export default function PaymentsPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {["No", "Kode Deposit", "No SJ","Tgl","Supplier","Ref Supplier","Kepada","Total Tagihan","Overdue","Status"].map((h) => (
+              {["No", "No So" ,"Kode Deposit", "No SJ","Tgl","Supplier","Ref Supplier","Kepada","Total Tagihan","Overdue","Status"].map((h) => (
                 <th key={h} className="p-3 text-left">{h}</th>
               ))}
             </tr>
@@ -159,6 +160,7 @@ export default function PaymentsPage() {
                   } hover:${row.status === "paid" ? "bg-green-300" : "bg-red-300"} transition-colors duration-150`}
                 >
                   <td className="p-3">{i + 1}</td>
+                  <td className="p-3 font-medium">{row.so_number}</td>
                   <td className="p-3 font-medium">
                   {row.deposit_code ?? "-"}
                 </td>

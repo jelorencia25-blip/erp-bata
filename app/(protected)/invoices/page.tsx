@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 
 type InvoiceRow = {
   id: string;
+  so_number: string;  // ❌ HAPUS INI (karena so_number ga ada di delivery_orders)
   sj_number: string;
+  customer_name: string; // ❌ HAPUS INI (karena customer_name ga ada di delivery_orders)
   delivery_date: string;
   sudah_tagih: boolean;
   sudah_bayar: boolean;
   sales_order?: {
+    id?: string;        // ✅ TAMBAHKAN
+    so_number?: string; // ✅ TAMBAHKAN INI
     customer?: {
       name: string;
     } | null;
@@ -146,7 +150,7 @@ export default function InvoicesPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase">
             <tr>
-              {["No", "No SJ", "Supplier", "Tanggal", "Sudah Tagih", "Sudah Bayar", "Action"].map((h) => (
+              {["No", "No So", "No SJ", "Supplier", "Tanggal", "Sudah Tagih", "Sudah Bayar", "Action"].map((h) => (
                 <th key={h} className="p-3 text-left">
                   {h}
                 </th>
@@ -168,6 +172,7 @@ export default function InvoicesPage() {
                   className="border-b hover:bg-gray-50 transition"
                 >
                   <td className="p-3">{i + 1}</td>
+                  <td className="p-3 font-medium">{r.sales_order?.so_number ?? "-"}</td>
                   <td className="p-3 font-medium">{r.sj_number}</td>
                   <td className="p-3">
                     {r.sales_order?.customer?.name ?? "-"}

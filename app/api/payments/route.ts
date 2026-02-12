@@ -32,7 +32,7 @@ export async function GET() {
         if (d.sales_order_id) {
           const { data: so } = await supabase
             .from("sales_orders")
-            .select("customer_id, ship_to_name, customer_order_ref, deposit_id")
+            .select("customer_id, so_number, ship_to_name, customer_order_ref, deposit_id")
             .eq("id", d.sales_order_id)
             .single();
 
@@ -111,6 +111,11 @@ export async function GET() {
 
         return {
           no: index + 1,
+          so_number: d.sales_order_id ? (await supabase
+            .from("sales_orders")
+            .select("so_number")
+            .eq("id", d.sales_order_id)
+            .single()).data?.so_number ?? null : null,
           delivery_order_id: d.id,
           no_sj: d.sj_number,
           tgl: d.delivery_date,

@@ -19,20 +19,21 @@ const supabase = createClient(
     const { data: deliveries, error } = await supabase
       .from("delivery_orders")
       .select(`
-        id,
-        sj_number,
-        delivery_date,
-        sudah_tagih,
-        sudah_bayar,
-        status,
-        sales_order:sales_orders (
-          id,
-          so_number,
-          customer:customers (
-            name
-          )
-        )
-      `)
+  id,
+  sj_number,
+  delivery_date,
+  sudah_tagih,
+  sudah_bayar,
+  status,
+  sales_order:sales_orders (
+    id,
+    so_number,
+    customer:customers (
+      name
+    )
+  )
+`)
+
       .eq("final_status", "final") 
       .not("sj_number", "is", null)
       .order("delivery_date", { ascending: false });
