@@ -1,10 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-// app/api/deliveries/processed/[id]/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// ============ EXISTING GET METHOD ============
+// ============ GET METHOD - FETCH DETAIL ============
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,6 +20,7 @@ export async function GET(
   );
   
   try {
+    // 🔥 Fetch delivery order
     const { data: delivery, error: deliveryError } = await supabase
       .from("delivery_orders")
       .select(`
@@ -40,6 +40,7 @@ export async function GET(
       return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
     }
 
+    // 🔥 Fetch staff (driver)
     let staff = null;
     if (delivery.driver_id) {
       const { data } = await supabase
@@ -50,6 +51,7 @@ export async function GET(
       staff = data ?? null;
     }
 
+    // 🔥 Fetch vehicle
     let vehicle = null;
     if (delivery.vehicle_id) {
       const { data } = await supabase
@@ -60,29 +62,37 @@ export async function GET(
       vehicle = data ?? null;
     }
 
-    const { data: deliveryItems, error: itemsError } = await supabase
-      .from("delivery_items")
-      .select("id, product_id, pallet_qty,total_pcs, kubik_m3")
-      .eq("delivery_order_id", id);
+    // 🔥 Fetch delivery_items (FRESH DATA - NO CACHE)
+const { data: deliveryItems, error: itemsError } = await supabase
+  .from("delivery_items")
+  .select("id, product_id, pallet_qty, total_pcs, kubik_m3")
+  .eq("delivery_order_id", id)
+  .order("id", { ascending: true }); // ✅ Pakai ID
 
     if (itemsError) throw itemsError;
 
+    console.log("✅ Delivery Items Count:", deliveryItems?.length);
+
+    // 🔥 Fetch return items
     const { data: returnItems } = await supabase
       .from("delivery_return_items")
       .select("*")
       .eq("delivery_order_id", id);
 
+    // 🔥 Fetch sales order
     const { data: salesOrder } = await supabase
       .from("sales_orders")
-      .select("so_number, customer_id, customer_order_ref, ship_to_name, contact_phone, delivery_address, notes, purchase_type")
+      .select("so_number, customer_id, customer_order_ref, ship_to_name, contact_phone, delivery_address, notes, purchase_type, order_date")
       .eq("id", delivery.sales_order_id)
       .single();
 
-          const { data: salesOrderItems } = await supabase
+    // 🔥 Fetch sales order items (untuk ambil total_m3)
+    const { data: salesOrderItems } = await supabase
       .from("sales_order_items")
       .select("id, product_id, total_m3")
       .eq("sales_order_id", delivery.sales_order_id);
 
+    // 🔥 Fetch customer name
     let customerName = "-";
     if (salesOrder?.customer_id) {
       const { data } = await supabase
@@ -93,6 +103,7 @@ export async function GET(
       customerName = data?.name ?? "-";
     }
 
+    // 🔥 Enrich delivery items with product info
     const enrichedItems = await Promise.all(
       (deliveryItems || []).map(async (item) => {
         const { data: product } = await supabase
@@ -105,7 +116,7 @@ export async function GET(
           (r) => r.product_id === item.product_id
         );
 
-           const soItem = salesOrderItems?.find(
+        const soItem = salesOrderItems?.find(
           (si) => si.product_id === item.product_id
         );
 
@@ -115,14 +126,12 @@ export async function GET(
           product_size: product?.ukuran ?? "-",
           isi_per_palet: product?.isi_per_palet ?? 0,
           return_pcs: returnItem?.return_pcs ?? 0,
-          kubik_m3: soItem?.total_m3 ?? 0,
+          kubik_m3: soItem?.total_m3 ?? item.kubik_m3 ?? 0,
         };
       })
     );
 
-
-    
-
+    // 🔥 Enrich return items
     const enrichedReturns = await Promise.all(
       (returnItems || []).map(async (item) => {
         const { data: product } = await supabase
@@ -139,12 +148,13 @@ export async function GET(
       })
     );
 
+    // 🔥 RETURN RESPONSE WITH NO-CACHE HEADERS
     return NextResponse.json({
       id: delivery.id,
       sj_number: delivery.sj_number ?? "-",
       no_gudang: delivery.no_gudang ?? "",
       so_number: salesOrder?.so_number ?? "-",
-      order_date: delivery.delivery_date ?? "-",
+      order_date: salesOrder?.order_date ?? delivery.delivery_date ?? "-",
       customer_name: customerName,
       customer_order_ref: salesOrder?.customer_order_ref ?? "-",
       ship_to_name: salesOrder?.ship_to_name ?? "-",
@@ -156,10 +166,16 @@ export async function GET(
       vehicle,
       delivery_items: enrichedItems,
       delivery_return_items: enrichedReturns,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
 
   } catch (err: any) {
-    console.error("DELIVERY DETAIL ERROR:", err);
+    console.error("❌ DELIVERY DETAIL ERROR:", err);
     return NextResponse.json(
       { error: err.message || "Gagal load data" },
       { status: 500 }
@@ -167,7 +183,7 @@ export async function GET(
   }
 }
 
-// ============ ⭐ NEW PUT METHOD - UNTUK UPDATE ============
+// ============ PUT METHOD - UPDATE ============
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -189,22 +205,23 @@ export async function PUT(
 
     console.log("📝 Update Processed Delivery:", { id, driver_id, vehicle_id, no_gudang, returns });
 
-    // Update driver, vehicle & no_gudang
-    if (driver_id && vehicle_id) {
+    // 🔥 Update driver, vehicle & no_gudang
+    if (driver_id || vehicle_id || no_gudang !== undefined) {
+      const updateData: any = {};
+      if (driver_id) updateData.driver_id = driver_id;
+      if (vehicle_id) updateData.vehicle_id = vehicle_id;
+      if (no_gudang !== undefined) updateData.no_gudang = no_gudang;
+
       const { error: updateError } = await supabase
         .from("delivery_orders")
-        .update({
-          driver_id,
-          vehicle_id,
-          no_gudang: no_gudang ?? "",
-        })
+        .update(updateData)
         .eq("id", id);
 
       if (updateError) throw updateError;
-      console.log("✅ Driver, Vehicle & No Gudang updated");
+      console.log("✅ Delivery updated");
     }
 
-    // Update return items
+    // 🔥 Update return items
     if (returns && Object.keys(returns).length > 0) {
       // Hapus return lama
       await supabase

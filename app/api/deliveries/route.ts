@@ -85,6 +85,7 @@ const supabase = createClient(
     sales_order_id,
     vehicle_id,
     driver_id,
+    delivery_date: new Date().toISOString().split('T')[0],
     status: "in_delivery",
     customer_id: so.customer_id,
     contact_name: so.ship_to_name,
@@ -179,6 +180,7 @@ if (so.status === "confirmed" || so.status === "approved") {
     return NextResponse.json({
       success: true,
       delivery_id: delivery.id,
+      delivery_date: delivery.delivery_date,
       so_number: so.so_number,
       items_created: deliveryItemsPayload.length,
       return_items_created: returnPayload.length,

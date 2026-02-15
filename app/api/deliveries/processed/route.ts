@@ -13,6 +13,7 @@ export async function GET() {
     .from("delivery_orders")
     .select(`
       id,
+      delivery_date,
       sj_number,
       final_status,
       sales_orders!inner (
@@ -72,6 +73,7 @@ export async function GET() {
 
       return {
         id: d.id,
+        delivery_date: d.delivery_date,
         final_status: d.final_status,
         sj_number: d.sj_number,
         so_number: so?.so_number ?? "-",

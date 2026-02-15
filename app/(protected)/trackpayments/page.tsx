@@ -77,11 +77,8 @@ export default function PaymentsPage() {
     const paid = filteredData.filter(d => d.status === "paid").length;
     const unpaid = filteredData.filter(d => d.status === "unpaid").length;
     const overdue = filteredData.filter(d => d.status === "unpaid" && d.overdue > 5).length;
-    const unpaidAmount = filteredData
-      .filter(d => d.status === "unpaid")
-      .reduce((sum, d) => sum + (d.total_tagihan ?? 0), 0);
-
-    return { total, paid, unpaid, overdue, unpaidAmount };
+ 
+    return { total, paid, unpaid, overdue };
   }, [filteredData]);
 
   if (loading)
@@ -98,7 +95,6 @@ export default function PaymentsPage() {
         <StatCard title="DO Dibayar" value={overview.paid} color="green" />
         <StatCard title="DO Belum Dibayar" value={overview.unpaid} color="red" />
         <StatCard title="Overdue > 5 Hari" value={overview.overdue} color="orange" />
-        <StatCard title="Total Unpaid (Rp)" value={overview.unpaidAmount} color="red" isCurrency />
       </div>
 
       {/* FILTER */}

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 type Row = {
   id: string;
+  delivery_date: string;
   sj_number: string;
   so_number: string;
   pelanggan: string;
@@ -208,6 +209,7 @@ export default function DeliveriesPage() {
           <thead className="bg-gray-200">
             <tr>
               <th className="p-3 text-center w-20">Action</th>
+              <SortTh label= "Tgl Delivery" col="delivery_date" />
               <SortTh label="No SJ" col="sj_number" />
               <SortTh label="No SO" col="so_number" />
               <SortTh label="Supplier" col="pelanggan" />
@@ -258,6 +260,13 @@ export default function DeliveriesPage() {
                       </span>
                     ))}
                 </td>
+
+<td className="p-3">
+  {row.delivery_date
+    ? new Date(row.delivery_date + "T00:00:00").toLocaleDateString("id-ID")
+    : "-"}
+</td>
+
 
                 <td className="p-3">{row.sj_number}</td>
                 <td className="p-3">{row.so_number}</td>
