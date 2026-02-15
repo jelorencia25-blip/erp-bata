@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 /* ================= TERBILANG ================= */
 function terbilang(n: number): string {
@@ -75,6 +77,7 @@ export default function InvoiceDetailPage() {
   const [error, setError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Fetch invoice data
   useEffect(() => {
@@ -126,7 +129,7 @@ export default function InvoiceDetailPage() {
       return;
     }
 
-    console.log("Saving invoice with bank_account_id:", selectedBank); // Debug log
+    console.log("Saving invoice with bank_account_id:", selectedBank);
 
     setIsSaving(true);
     setSaveSuccess(false);
@@ -137,7 +140,7 @@ export default function InvoiceDetailPage() {
         bank_account_id: selectedBank,
       };
       
-      console.log("Payload being sent:", payload); // Debug log
+      console.log("Payload being sent:", payload);
 
       const response = await fetch(`/api/invoices/${id}`, {
         method: 'PATCH',
@@ -161,10 +164,141 @@ export default function InvoiceDetailPage() {
       // Hide success message after 3 seconds
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      console.error("Save error details:", err); // Debug log
+      console.error("Save error details:", err);
       alert(`Error saving invoice: ${err.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle download PDF - Fixed untuk tidak terpotong
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    
+    try {
+      const element = document.getElementById('print-content');
+      if (!element) {
+        throw new Error('Print content not found');
+      }
+
+      // Sembunyikan dropdown
+      const dropdown = element.querySelector('.print\\:hidden');
+      if (dropdown) {
+        (dropdown as HTMLElement).style.display = 'none';
+      }
+
+      // Clone element untuk manipulation
+      const clone = element.cloneNode(true) as HTMLElement;
+      
+      // Set explicit width untuk prevent overflow
+      clone.style.width = '210mm'; // A4 width
+      clone.style.maxWidth = '210mm';
+      clone.style.boxSizing = 'border-box';
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      clone.style.top = '0';
+      clone.style.backgroundColor = '#ffffff';
+      
+      document.body.appendChild(clone);
+
+      // Force safe colors di clone
+      const replaceColors = (el: Element) => {
+        if (el instanceof HTMLElement) {
+          el.style.setProperty('color', '#000000', 'important');
+          el.style.setProperty('border-color', '#000000', 'important');
+          
+          const bgColor = window.getComputedStyle(el).backgroundColor;
+          if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+            el.style.setProperty('background-color', '#ffffff', 'important');
+          }
+          
+          if (el.tagName === 'THEAD' || el.classList.contains('bg-gray-800')) {
+            el.style.setProperty('background-color', '#e5e7eb', 'important');
+            el.style.setProperty('color', '#000000', 'important');
+          }
+
+          if (el.classList.contains('bg-gray-100')) {
+            el.style.setProperty('background-color', '#f3f4f6', 'important');
+          }
+        }
+        
+        Array.from(el.children).forEach(replaceColors);
+      };
+      
+      replaceColors(clone);
+
+      // Capture dengan settings optimal
+      const canvas = await html2canvas(clone, {
+        scale: 2, // High quality
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+        foreignObjectRendering: false,
+        imageTimeout: 0,
+        removeContainer: false
+      });
+
+      // Remove clone
+      document.body.removeChild(clone);
+
+      // Restore dropdown
+      if (dropdown) {
+        (dropdown as HTMLElement).style.display = '';
+      }
+
+      // Generate PDF dengan proper sizing
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Calculate image dimensions to fit A4
+      const imgWidth = pdfWidth - 20; // 10mm margin on each side
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      const xOffset = 10; // Center with 10mm margin
+      let yOffset = 10;
+
+      // Add image to PDF
+      const imgData = canvas.toDataURL('image/png', 0.95);
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight, undefined, 'FAST');
+
+      // Check if need multiple pages
+      let heightLeft = imgHeight - (pdfHeight - 20);
+      
+      while (heightLeft > 0) {
+        pdf.addPage();
+        yOffset = -heightLeft + 10;
+        pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= (pdfHeight - 20);
+      }
+
+      // Generate filename
+      const fileName = `Invoice_${data.sj_number}_${data.kepada}`.replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf';
+      
+      // Download
+      pdf.save(fileName);
+      
+    } catch (err: any) {
+      console.error('Error generating PDF:', err);
+      
+      const errorMsg = err.message.includes('lab') 
+        ? 'Browser color format tidak support.'
+        : `Error: ${err.message}`;
+      
+      alert(`Gagal download PDF.\n\n${errorMsg}\n\nAlternatif: Gunakan tombol Print (🖨️) lalu pilih "Save as PDF" di dialog.`);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -207,6 +341,13 @@ export default function InvoiceDetailPage() {
             {isSaving ? "Saving..." : "💾 Save Invoice"}
           </button>
           <button
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 disabled:bg-gray-400 rounded"
+          >
+            {isDownloading ? "⏳ Downloading..." : "📥 Download PDF"}
+          </button>
+          <button
             onClick={() => window.print()}
             className="px-4 py-2 border border-black hover:bg-gray-100 rounded"
           >
@@ -216,7 +357,11 @@ export default function InvoiceDetailPage() {
       </div>
 
       {/* INVOICE */}
-      <div id="print-content" className="border-2 border-black p-4">
+      <div id="print-content" className="border-2 border-black p-4" style={{
+        colorScheme: 'light',
+        color: 'rgb(0, 0, 0)',
+        backgroundColor: 'rgb(255, 255, 255)'
+      }}>
         {/* TITLE */}
         <div className="text-2xl font-bold mb-3 text-center">
           INVOICE <span className="font-normal">{data.sj_number}</span>
@@ -232,11 +377,12 @@ export default function InvoiceDetailPage() {
             </div>
             <div className="flex gap-2 items-center">
               <span className="font-bold">Tanggal:</span>
+              <span className="print:inline hidden">{selectedDate}</span>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="border border-gray-300 px-2 py-0.5 rounded text-sm print:border-0 print:p-0"
+                className="border border-gray-300 px-2 py-0.5 rounded text-sm print:hidden"
               />
             </div>
           </div>
@@ -267,8 +413,15 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* TABLE - Compact */}
-        <table className="w-full border-collapse border-2 border-black mb-3">
-          <thead className="bg-gray-800 text-white">
+        <table className="w-full border-collapse border-2 border-black mb-3" style={{
+          color: 'rgb(0, 0, 0)',
+          backgroundColor: 'rgb(255, 255, 255)',
+          borderColor: 'rgb(0, 0, 0)'
+        }}>
+          <thead className="bg-gray-800 text-white print:bg-white print:text-black" style={{
+            color: 'rgb(255, 255, 255)',
+            backgroundColor: 'rgb(31, 41, 55)'
+          }}>
             <tr>
               <th className="border border-black px-2 py-1 text-center w-8">No</th>
               <th className="border border-black px-2 py-1 text-left">Barang / Ukuran</th>
@@ -307,8 +460,6 @@ export default function InvoiceDetailPage() {
         <div className="grid grid-cols-2 gap-8 mt-4">
           {/* LEFT - Bank & Signature */}
           <div className="flex flex-col">
-            {/* REKENING TRANSFER - Content gede, label kecil */}
-           {/* REKENING TRANSFER FIXED */}
 {/* DROPDOWN UNTUK EDIT */}
 <div className="mb-3 border-2 border-black p-2 print:hidden">
   <select
@@ -333,21 +484,19 @@ export default function InvoiceDetailPage() {
         <td className="font-bold">
           {bankAccounts.length > 0 && selectedBank
             ? `${bankAccounts.find(b => b.id === selectedBank)?.bank_name} – ${bankAccounts.find(b => b.id === selectedBank)?.account_number}`
-            : "BCA – NOREK" /* fallback */}
+            : "BCA – NOREK"}
         </td>
       </tr>
       <tr>
         <td className="font-bold">
           {bankAccounts.length > 0 && selectedBank
             ? `A/N ${bankAccounts.find(b => b.id === selectedBank)?.account_holder}`
-            : "A/N" /* fallback */}
+            : "A/N"}
         </td>
       </tr>
     </tbody>
   </table>
 </div>
-
-
 
             {/* TERBILANG - Lebih besar */}
             <div className="text-base italic mb-3 font-semibold">
@@ -378,7 +527,7 @@ export default function InvoiceDetailPage() {
                   - Rp {(data.total_retur ?? 0).toLocaleString("id-ID")}
                 </span>
               </div>
-              <div className="flex justify-between border-2 border-black py-2 px-3 font-bold text-base bg-gray-100">
+              <div className="flex justify-between border-2 border-black py-2 px-3 font-bold text-base bg-gray-100 print:bg-white">
                 <span>TOTAL TAGIHAN</span>
                 <span>
                   Rp {(data.total_tagihan ?? 0).toLocaleString("id-ID")}
@@ -407,19 +556,19 @@ export default function InvoiceDetailPage() {
 
   body {
     font-family: "Courier New", Courier, monospace !important;
-    color: #000 !important; /* pitch black text */
-    background: #fff !important; /* ensure white background */
+    color: #000 !important;
+    background: #fff !important;
   }
 
   body * {
-    visibility: hidden; /* hide everything by default */
+    visibility: hidden;
   }
 
   #print-content,
   #print-content * {
     visibility: visible;
-    color: #000 !important; /* force pitch black */
-    font-weight: 300 !important; /* max bold */
+    color: #000 !important;
+    font-weight: 300 !important;
   }
 
   #print-content {
@@ -484,7 +633,7 @@ export default function InvoiceDetailPage() {
   /* ================= TERBILANG ================= */
   #print-content .italic {
     font-style: italic !important;
-    font-weight: 300 !important; /* still normal for terbilang */
+    font-weight: 300 !important;
     color: #000 !important;
   }
 
@@ -498,44 +647,6 @@ export default function InvoiceDetailPage() {
     background: #fff !important;
     color: #000 !important;
     font-weight: 300 !important;
-  }
-
-  /* ================= REKENING TRANSFER ================= */
-  #print-content .rekening-transfer {
-    font-size: 10pt !important;
-    font-weight: 300 !important;
-    line-height: 1 !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    overflow-wrap: break-word !important;
-    padding: 8pt 10pt !important;
-    margin-top: 6pt !important;
-    page-break-inside: avoid !important;
-    color: #000 !important;
-    background: #fff !important;
-  }
-
-  #print-content .rekening-transfer * {
-    font-size: inherit !important;
-    font-weight: inherit !important;
-    color: #000 !important;
-  }
-
-  /* ================= SIGNATURE ================= */
-  .signature-box {
-    min-height: 70pt !important;
-    padding-top: 10pt !important;
-    text-align: center !important;
-    color: #000 !important;
-  }
-
-  .signature-line {
-    display: inline-block !important;
-    min-width: 160pt !important;
-    border-top: 1pt solid #000 !important;
-    padding-top: 2pt !important;
-    font-size: 8pt !important;
-    color: #000 !important;
   }
 
   /* ================= FORM ELEMENT ================= */
@@ -553,9 +664,20 @@ export default function InvoiceDetailPage() {
   .print\\:hidden {
     display: none !important;
   }
+  
+  .print\\:inline {
+    display: inline !important;
+  }
+  
+  .print\\:bg-white {
+    background: #fff !important;
+  }
+  
+  .print\\:text-black {
+    color: #000 !important;
+  }
 
 }
-
 
 `}</style>
 

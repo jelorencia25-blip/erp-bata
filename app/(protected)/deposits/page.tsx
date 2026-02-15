@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Deposit = {
   id: string;
@@ -73,6 +74,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function DepositsPage() {
+  const router = useRouter();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,7 +328,6 @@ export default function DepositsPage() {
       )}
       
 
-      // confirmation step can be added here
       {showConfirmationStep && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -422,23 +423,32 @@ export default function DepositsPage() {
                     <StatusBadge status={d.status} />
                   </td>
                   <td className="p-3 text-center">
-                    <button
-                      onClick={() => fetchDepositDetail(d.id)}
-                      className="text-blue-600 hover:underline mr-2"
-                    >
-                      Detail
-                    </button>
-                    {d.status === 'active' && (
+                    <div className="flex flex-col gap-1">
                       <button
-                        onClick={() => {
-                          fetchDepositDetail(d.id);
-                          setShowTopUpModal(true);
-                        }}
-                        className="text-green-600 hover:underline"
+                        onClick={() => fetchDepositDetail(d.id)}
+                        className="text-blue-600 hover:underline"
                       >
-                        Top Up
+                        Detail
                       </button>
-                    )}
+                      {d.status === 'active' && (
+                        <button
+                          onClick={() => {
+                            fetchDepositDetail(d.id);
+                            setShowTopUpModal(true);
+                          }}
+                          className="text-green-600 hover:underline"
+                        >
+                          Top Up
+                        </button>
+                      )}
+                      <button
+                        onClick={() => router.push(`/deposits/payment-receipt?deposit_id=${d.id}`)}
+                        className="text-purple-600 hover:underline"
+                      >
+                        Tanda Terima
+                      </button>
+                    </div>
+                
                   </td>
                 </tr>
               ))

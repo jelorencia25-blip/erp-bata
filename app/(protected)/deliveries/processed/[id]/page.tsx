@@ -529,9 +529,10 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           }
 
           body {
-            font-family: Arial, Helvetica, sans-serif !important;
+            font-family: OCR-B, Consolas, Roboto Mono, sans-serif !important;
             font-size: 12pt !important;
             font-weight: 300 !important;
+             letter-spacing: 0.5px;  
             color: #000 !important;
             -webkit-font-smoothing: none !important;
             -moz-osx-font-smoothing: auto !important;
