@@ -234,24 +234,24 @@ export default function SalesOrderDetailPage() {
   /* ======================
      HANDLE DEPOSIT SELECT
   ====================== */
-  const handleSelectDeposit = (deposit: Deposit | null) => {
-    if (!deposit) return;
+  // const handleSelectDeposit = (deposit: Deposit | null) => {
+  //   if (!deposit) return;
 
-    setItems(prev =>
-      prev.map(item => ({
-        ...item,
-        price_m3:
-          item.price_m3 && item.price_m3 > 0
-            ? item.price_m3
-            : deposit.price_lock_per_m3,
-      }))
-    );
-  };
+  //   setItems(prev =>
+  //     prev.map(item => ({
+  //       ...item,
+  //       price_m3:
+  //         item.price_m3 && item.price_m3 > 0
+  //           ? item.price_m3
+  //           : deposit.price_lock_per_m3,
+  //     }))
+  //   );
+  // };
 
-  useEffect(() => {
-    const dep = deposits.find(d => d.id === selectedDepositId) ?? null;
-    handleSelectDeposit(dep);
-  }, [selectedDepositId, deposits]);
+  // useEffect(() => {
+  //   const dep = deposits.find(d => d.id === selectedDepositId) ?? null;
+  //   handleSelectDeposit(dep);
+  // }, [selectedDepositId, deposits]);
 
   /* ======================
      UPDATE ITEM
@@ -514,7 +514,7 @@ export default function SalesOrderDetailPage() {
               </select>
             </FormRow>
 
-            <FormRow label="Deposit">
+            {/* <FormRow label="Deposit">
               <select
                 value={selectedDepositId ?? ""}
                 onChange={(e) =>
@@ -532,7 +532,7 @@ export default function SalesOrderDetailPage() {
                   </option>
                 ))}
               </select>
-            </FormRow>
+            </FormRow> */}
           </div>
 
           <div className="space-y-4">

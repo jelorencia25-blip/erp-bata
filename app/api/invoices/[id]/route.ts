@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -95,7 +97,7 @@ export async function GET(
       .eq("sales_order_id", delivery.sales_order_id);
 
     // ===============================
-    // 5️⃣ DELIVERY ITEMS (untuk cross-check)
+    // 5️⃣ DELIVERY ITEMS (hanya untuk retur cross-check)
     // ===============================
     const { data: deliveryItems } = await supabaseAdmin
       .from("delivery_items")
@@ -147,24 +149,24 @@ export async function GET(
           .eq("id", item.product_id)
           .single();
 
-        const deliveredItem = deliveryItems?.find(
-          (di) => di.product_id === item.product_id
-        );
-
         const returnItem = returItemsRaw?.find(
           (r) => r.product_id === item.product_id
         );
 
-        const actualPcs = deliveredItem?.total_pcs ?? item.total_pcs ?? 0;
-        const actualPalet = deliveredItem?.pallet_qty ?? item.pallet_qty ?? 0;
+        // ✅ FIX: Semua pakai SO sebagai source of truth
+        const actualPcs = item.total_pcs ?? 0;
+        const actualPalet = item.pallet_qty ?? 0;
+        
+        // ✅ Retur tetap dari delivery_return_items
         const returnPcs = returnItem?.return_pcs ?? 0;
 
+        // ✅ FIX: Harga satuan pakai total_pcs dari SO
         let hargaSatuan = 0;
-        if ((item as any).total_price && actualPcs > 0) {
-          hargaSatuan = Math.round((item as any).total_price / actualPcs);
-        } else if ((item as any).price_per_m3 && (item as any).total_m3) {
+        if ((item as any).total_price && (item as any).total_pcs > 0) {
+          hargaSatuan = Math.round((item as any).total_price / (item as any).total_pcs);
+        } else if ((item as any).price_per_m3 && (item as any).total_m3 && (item as any).total_pcs > 0) {
           const totalHarga = (item as any).price_per_m3 * (item as any).total_m3;
-          hargaSatuan = actualPcs > 0 ? Math.round(totalHarga / actualPcs) : 0;
+          hargaSatuan = Math.round(totalHarga / (item as any).total_pcs);
         }
 
         const jumlah = actualPcs * hargaSatuan;
@@ -284,7 +286,6 @@ export async function PATCH(
     // ===============================
     // 2️⃣ RETURN UPDATED DATA
     // ===============================
-    // Call GET to return fresh data
     const getResponse = await GET(req, { params: Promise.resolve({ id: deliveryId }) });
     return getResponse;
 

@@ -1,0 +1,29 @@
+export const dynamic = 'force-dynamic'
+
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+export async function GET() {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("bank_accounts")
+      .select("id, bank_name, account_number, account_holder") // ✅ ADDED ID
+      .eq("is_active", true)
+      .order("bank_name", { ascending: true });
+
+    if (error) throw error;
+
+    return NextResponse.json(data || []);
+  } catch (err: any) {
+    console.error("Bank Accounts Error:", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to fetch bank accounts" },
+      { status: 500 }
+    );
+  }
+}

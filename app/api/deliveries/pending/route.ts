@@ -10,71 +10,11 @@ export async function GET() {
   );
 
   try {
-    // 1️⃣ Ambil SO yang sudah punya delivery
-    const { data: deliveredSO, error: deliveredError } = await supabase
-      .from("delivery_orders")
-      .select("sales_order_id");
-
-    if (deliveredError) throw deliveredError;
-
-    const deliveredIds = (deliveredSO ?? [])
-      .map(d => d.sales_order_id)
-      .filter(Boolean);
-
-    // 2️⃣ Ambil SO yang BELUM ada di delivery & TIDAK cancelled
-    let query = supabase
-      .from("sales_orders")
-      .select(`
-        id,
-        so_number,
-        ship_to_name,
-        delivery_address,
-        status,
-        sales_order_items (
-          total_pcs,
-          pallet_qty
-        )
-      `)
-      .neq("status", "cancelled")  // 🔥 FILTER CANCELLED
-      .order("created_at", { ascending: false });
-
-    if (deliveredIds.length > 0) {
-      query = query.not("id", "in", `(${deliveredIds.join(",")})`);
-    }
-
-    const { data, error } = await query;
+    // ✅ Langsung query SO yang belum ada di delivery_orders via SQL
+    const { data, error } = await supabase.rpc('get_pending_deliveries');
+    
     if (error) throw error;
-
-    // 3️⃣ Mapping
-    const rows = (data ?? []).map((so: any) => {
-      const totalPCS = so.sales_order_items?.reduce(
-        (sum: number, i: any) => sum + (i.total_pcs ?? 0),
-        0
-      ) ?? 0;
-
-      const totalPalet = so.sales_order_items?.reduce(
-        (sum: number, i: any) => sum + (i.pallet_qty ?? 0),
-        0
-      ) ?? 0;
-
-      return {
-        id: so.id,
-        sj_number: "-",
-        so_number: so.so_number,
-        pelanggan: "-",
-        kepada: so.ship_to_name ?? "-",
-        alamat: so.delivery_address ?? "-",
-        ukuran: "-",
-        total_pcs: totalPCS,
-        palet: totalPalet,
-        kubik_m3: null,
-        supir: "-",
-        plat_mobil: "-",
-        so_status: so.status,  // 🔥 INCLUDE STATUS
-      };
-    });
-
-    return NextResponse.json(rows);
+    return NextResponse.json(data ?? []);
   } catch (err: any) {
     console.error("❌ GET PENDING DELIVERIES ERROR:", err);
     return NextResponse.json(

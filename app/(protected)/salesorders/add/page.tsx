@@ -6,11 +6,6 @@ import SalesOrderForm from "@/components/sales-order/SalesOrderForm";
 
 
 /* ======================
-   Generate Nomor SO
-====================== */
-
-
-/* ======================
    Helper Rupiah
 ====================== */
 const rupiah = (n: number) =>
@@ -451,7 +446,7 @@ const updateItem = (idx: number, field: string, value: any) => {
     <option value="Locco">Locco</option>
   </select>
 </FormRow>
-
+{/* 
 <FormRow label="Deposit">
   <select
     value={selectedDepositId ?? ""}
@@ -470,7 +465,7 @@ const updateItem = (idx: number, field: string, value: any) => {
 </option>
     ))}
   </select>
-</FormRow>
+</FormRow> */}
 
 
 

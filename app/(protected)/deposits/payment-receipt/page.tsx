@@ -31,7 +31,7 @@ export default function DepositPaymentReceiptPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  
+
   const [formData, setFormData] = useState<DepositPaymentReceipt>({
     deposit_id: depositId || '',
     deposit_code: '',
@@ -44,7 +44,6 @@ export default function DepositPaymentReceiptPage() {
     notes: '',
   });
 
-  // Fetch deposit info
   useEffect(() => {
     if (!depositId) {
       router.push('/deposits');
@@ -61,28 +60,27 @@ export default function DepositPaymentReceiptPage() {
       .then(([depositData, bankData]) => {
         const deposit = depositData.deposit;
         const payments = depositData.payments || [];
-        
-        // Get last payment amount or 0
-        const lastPaymentAmount = payments.length > 0 
-          ? payments[0].amount 
-          : 0;
-        
-        // Build deposit description with proper format
-        // Example: "DEPOSIT 5 DO 425000/m3 (12.6 m3/DO) FRANCO"
+
+        // ✅ Fix: jumlahkan SEMUA payments, bukan cuma yang pertama
+        const totalPaymentAmount = payments.reduce(
+          (sum: number, p: any) => sum + (p.amount || 0),
+          0
+        );
+
         const doCount = deposit.total_do_tagged;
         const pricePerM3 = deposit.price_lock_per_m3;
         const notes = deposit.notes || '';
-        
+
         const depositDescription = `DEPOSIT ${doCount} DO ${pricePerM3.toLocaleString('id-ID')}/m3${notes ? ` ${notes}` : ''}`;
-        
+
         setFormData((prev) => ({
           ...prev,
           deposit_code: deposit.deposit_code,
           supplier_name: deposit.customer_name,
-          notes: depositDescription, // Auto-fill with full description
-          amount: lastPaymentAmount, // Auto-fill with last payment or 0
+          notes: depositDescription,
+          amount: totalPaymentAmount, // ✅ total semua payments
         }));
-        
+
         setBankAccounts(bankData);
         if (bankData.length > 0) {
           setFormData((prev) => ({
@@ -178,38 +176,30 @@ export default function DepositPaymentReceiptPage() {
         </div>
       </div>
 
-      {/* RECEIPT - Excel Style */}
+      {/* RECEIPT */}
       <div
         id="receipt-content"
         className="max-w-4xl mx-auto bg-white shadow-lg"
         style={{ fontFamily: 'Arial, sans-serif' }}
       >
-        {/* HEADER */}
         <div className="border-2 border-black">
           <table className="w-full">
             <tbody>
               {/* TITLE */}
               <tr>
-                <td
-                  colSpan={6}
-                  className="border-b-2 border-black p-2 text-center font-bold text-lg"
-                >
+                <td colSpan={6} className="border-b-2 border-black p-2 text-center font-bold text-lg">
                   TANDA TERIMA PEMBAYARAN
                 </td>
               </tr>
 
               {/* ROW 1: Tanggal */}
               <tr>
-                <td className="border border-black p-2 font-semibold bg-gray-100 w-32">
-                  Tanggal
-                </td>
+                <td className="border border-black p-2 font-semibold bg-gray-100 w-32">Tanggal</td>
                 <td className="border border-black p-1" colSpan={5}>
                   <input
                     type="date"
                     value={formData.payment_date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, payment_date: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
                     className="w-full px-2 py-1 border-0 focus:outline-none print:border-0"
                   />
                 </td>
@@ -217,9 +207,7 @@ export default function DepositPaymentReceiptPage() {
 
               {/* ROW 2: Nama Supplier */}
               <tr>
-                <td className="border border-black p-2 font-semibold bg-gray-100">
-                  Nama Supplier
-                </td>
+                <td className="border border-black p-2 font-semibold bg-gray-100">Nama Supplier</td>
                 <td className="border border-black p-2" colSpan={5}>
                   {formData.supplier_name}
                 </td>
@@ -227,16 +215,12 @@ export default function DepositPaymentReceiptPage() {
 
               {/* ROW 3: SALES */}
               <tr>
-                <td className="border border-black p-2 font-semibold bg-gray-100">
-                  SALES
-                </td>
+                <td className="border border-black p-2 font-semibold bg-gray-100">SALES</td>
                 <td className="border border-black p-1" colSpan={5}>
                   <input
                     type="text"
                     value={formData.sales_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, sales_name: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, sales_name: e.target.value })}
                     placeholder="Nama Sales"
                     className="w-full px-2 py-1 border-0 focus:outline-none print:border-0"
                   />
@@ -244,37 +228,24 @@ export default function DepositPaymentReceiptPage() {
               </tr>
 
               {/* SPACER */}
-              <tr>
-                <td colSpan={6} className="p-1"></td>
-              </tr>
+              <tr><td colSpan={6} className="p-1"></td></tr>
 
-              {/* ROW 4: Intro text */}
+              {/* ROW 4: Intro */}
               <tr>
                 <td colSpan={6} className="border border-black p-2">
                   Menyatakan dengan sebenarnya bahwa telah menerima pembayaran:
                 </td>
               </tr>
 
-              {/* ROW 5: Detail header */}
+              {/* ROW 5: Header */}
               <tr>
-                <td className="border border-black p-2 text-center font-semibold bg-gray-100">
-                  No
-                </td>
-                <td
-                  className="border border-black p-2 font-semibold bg-gray-100"
-                  colSpan={2}
-                >
+                <td className="border border-black p-2 text-center font-semibold bg-gray-100">No</td>
+                <td className="border border-black p-2 font-semibold bg-gray-100" colSpan={2}>
                   DEPOSIT {formData.deposit_code}
                 </td>
-                <td className="border border-black p-2 text-center font-semibold bg-gray-100">
-                  Qty
-                </td>
-                <td className="border border-black p-2 text-center font-semibold bg-gray-100">
-                  Rp
-                </td>
-                <td className="border border-black p-2 text-center font-semibold bg-gray-100">
-                  Rp
-                </td>
+                <td className="border border-black p-2 text-center font-semibold bg-gray-100">Qty</td>
+                <td className="border border-black p-2 text-center font-semibold bg-gray-100">Rp</td>
+                <td className="border border-black p-2 text-center font-semibold bg-gray-100">Rp</td>
               </tr>
 
               {/* ROW 6: Amount */}
@@ -284,9 +255,7 @@ export default function DepositPaymentReceiptPage() {
                   <input
                     type="text"
                     value={formData.notes}
-                    onChange={(e) =>
-                      setFormData({ ...formData, notes: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Keterangan (opsional)"
                     className="w-full px-2 py-1 border-0 focus:outline-none print:border-0"
                   />
@@ -297,10 +266,7 @@ export default function DepositPaymentReceiptPage() {
                     type="number"
                     value={formData.amount || ''}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        amount: parseFloat(e.target.value) || 0,
-                      })
+                      setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })
                     }
                     className="w-full px-2 py-1 text-right border-0 focus:outline-none print:border-0"
                   />
@@ -311,37 +277,28 @@ export default function DepositPaymentReceiptPage() {
               </tr>
 
               {/* SPACER */}
-              <tr>
-                <td colSpan={6} className="p-1"></td>
-              </tr>
+              <tr><td colSpan={6} className="p-1"></td></tr>
 
-              {/* ROW 7: Total - 1 ROW ONLY */}
+              {/* ROW 7: Total */}
               <tr>
                 <td colSpan={3}></td>
-                <td className="border border-black p-2 text-right font-semibold bg-gray-100">
-                  Jumlah
-                </td>
+                <td className="border border-black p-2 text-right font-semibold bg-gray-100">Jumlah</td>
                 <td className="border-2 border-black p-2 text-right font-bold" colSpan={2}>
                   Rp {formData.amount.toLocaleString('id-ID')}
                 </td>
               </tr>
 
               {/* SPACER */}
-              <tr>
-                <td colSpan={6} className="p-1"></td>
-              </tr>
+              <tr><td colSpan={6} className="p-1"></td></tr>
 
               {/* ROW 8: Terbilang */}
               <tr>
-                <td
-                  colSpan={6}
-                  className="border border-black p-2 italic font-semibold"
-                >
+                <td colSpan={6} className="border border-black p-2 italic font-semibold">
                   Terbilang: {amountInWords}
                 </td>
               </tr>
 
-              {/* ROW 9: Transfer - SUPER BESAR */}
+              {/* ROW 9: Transfer */}
               <tr>
                 <td
                   colSpan={6}
@@ -351,9 +308,7 @@ export default function DepositPaymentReceiptPage() {
                   <div className="print:hidden mb-2">
                     <select
                       value={formData.bank_account_id}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bank_account_id: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, bank_account_id: e.target.value })}
                       className="w-full border border-gray-300 rounded px-2 py-1"
                     >
                       {bankAccounts.map((b) => (
@@ -370,15 +325,13 @@ export default function DepositPaymentReceiptPage() {
                 </td>
               </tr>
 
-              {/* ROW 10: Reference (editable) */}
+              {/* ROW 10: Reference */}
               <tr>
                 <td colSpan={6} className="border border-black p-1">
                   <input
                     type="text"
                     value={formData.reference_number}
-                    onChange={(e) =>
-                      setFormData({ ...formData, reference_number: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
                     placeholder="Nomor referensi transfer (opsional)"
                     className="w-full px-2 py-1 border-0 focus:outline-none print:border-0 text-sm"
                   />
@@ -386,9 +339,7 @@ export default function DepositPaymentReceiptPage() {
               </tr>
 
               {/* SPACER */}
-              <tr>
-                <td colSpan={6} className="p-1"></td>
-              </tr>
+              <tr><td colSpan={6} className="p-1"></td></tr>
 
               {/* ROW 11: Signatures */}
               <tr>
@@ -406,29 +357,25 @@ export default function DepositPaymentReceiptPage() {
         </div>
       </div>
 
-            {/* PRINT STYLES - FINAL FIX */}
+      {/* PRINT STYLES */}
       <style jsx global>{`
         @media print {
           @page {
             size: A5 portrait;
             margin: 6mm;
           }
-
           body {
             background: white !important;
             margin: 0 !important;
             padding: 0 !important;
           }
-
           body * {
             visibility: hidden;
           }
-
           #receipt-content,
           #receipt-content * {
             visibility: visible !important;
           }
-
           #receipt-content {
             position: absolute;
             left: 0;
@@ -441,14 +388,12 @@ export default function DepositPaymentReceiptPage() {
             overflow: visible !important;
             page-break-inside: avoid !important;
           }
-
           #receipt-content table {
             width: 100% !important;
             font-size: 8pt !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
           }
-
           #receipt-content td {
             padding: 2px 3px !important;
             word-wrap: break-word !important;
@@ -457,12 +402,10 @@ export default function DepositPaymentReceiptPage() {
             white-space: normal !important;
             line-height: 1.2 !important;
           }
-
           #receipt-content .text-lg {
             font-size: 11pt !important;
             font-weight: bold !important;
           }
-
           #receipt-content td.font-extrabold,
           #receipt-content td.text-lg.font-extrabold {
             font-size: 12pt !important;
@@ -470,33 +413,26 @@ export default function DepositPaymentReceiptPage() {
             line-height: 1.4 !important;
             padding: 4px 5px !important;
           }
-
           #receipt-content .uppercase {
             text-transform: uppercase !important;
           }
-
           #receipt-content .text-sm {
             font-size: 7.5pt !important;
           }
-
           #receipt-content .mb-12 {
             margin-bottom: 25px !important;
           }
-
           #receipt-content td.w-32 {
             width: 30mm !important;
           }
-
           .print\:hidden {
             display: none !important;
             visibility: hidden !important;
           }
-
           .print\:block {
             display: block !important;
             visibility: visible !important;
           }
-
           input, select {
             border: none !important;
             outline: none !important;
@@ -504,81 +440,47 @@ export default function DepositPaymentReceiptPage() {
             appearance: none;
             background: transparent !important;
           }
-
           table, th, td {
             border: 0.5pt solid black !important;
           }
-
           #receipt-content > div {
             border: 1.5pt solid black !important;
           }
-
           * {
             color: black !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-
           .bg-gray-100 {
             background-color: #f3f4f6 !important;
           }
-
-          .font-bold {
-            font-weight: 700 !important;
-          }
-
-          .font-semibold {
-            font-weight: 600 !important;
-          }
-
-          .font-extrabold {
-            font-weight: 900 !important;
-          }
-
-          .italic {
-            font-style: italic !important;
-          }
+          .font-bold { font-weight: 700 !important; }
+          .font-semibold { font-weight: 600 !important; }
+          .font-extrabold { font-weight: 900 !important; }
+          .italic { font-style: italic !important; }
         }
       `}</style>
-
     </div>
   );
 }
 
-// Helper: Convert number to Indonesian words
 function numberToWords(num: number): string {
   if (num === 0) return 'Nol Rupiah';
 
   const ones = [
-    '',
-    'Satu',
-    'Dua',
-    'Tiga',
-    'Empat',
-    'Lima',
-    'Enam',
-    'Tujuh',
-    'Delapan',
-    'Sembilan',
-    'Sepuluh',
-    'Sebelas',
+    '', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima',
+    'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas',
   ];
 
   function convert(n: number): string {
     if (n < 12) return ones[n];
     if (n < 20) return ones[n - 10] + ' Belas';
-    if (n < 100)
-      return ones[Math.floor(n / 10)] + ' Puluh ' + convert(n % 10);
+    if (n < 100) return ones[Math.floor(n / 10)] + ' Puluh ' + convert(n % 10);
     if (n < 200) return 'Seratus ' + convert(n - 100);
-    if (n < 1000)
-      return ones[Math.floor(n / 100)] + ' Ratus ' + convert(n % 100);
+    if (n < 1000) return ones[Math.floor(n / 100)] + ' Ratus ' + convert(n % 100);
     if (n < 2000) return 'Seribu ' + convert(n - 1000);
-    if (n < 1000000)
-      return convert(Math.floor(n / 1000)) + ' Ribu ' + convert(n % 1000);
-    if (n < 1000000000)
-      return (
-        convert(Math.floor(n / 1000000)) + ' Juta ' + convert(n % 1000000)
-      );
+    if (n < 1000000) return convert(Math.floor(n / 1000)) + ' Ribu ' + convert(n % 1000);
+    if (n < 1000000000) return convert(Math.floor(n / 1000000)) + ' Juta ' + convert(n % 1000000);
     return n.toString();
   }
 

@@ -43,8 +43,8 @@ type DepositDetail = {
     do_count: number;
     amount_used: number;
     created_at: string;
-    sj_number: string;              // 🔥 TAMBAH INI
-    delivery_date: string;  
+    sj_number: string;
+    delivery_date: string;
     sales_order: {
       id: string;
       so_number: string;
@@ -55,19 +55,25 @@ type DepositDetail = {
   }>;
 };
 
+type UnlinkedSO = {
+  id: string;
+  so_number: string;
+  order_date: string;
+  ship_to_name: string;
+  status: string;
+};
+
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
     completed: 'bg-blue-100 text-blue-800',
     cancelled: 'bg-red-100 text-red-800',
+    pending: 'bg-yellow-100 text-yellow-800',
+    in_delivery: 'bg-orange-100 text-orange-800',
   };
 
   return (
-    <span
-      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-        styles[status] || 'bg-gray-200'
-      }`}
-    >
+    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[status] || 'bg-gray-200'}`}>
       {status.toUpperCase()}
     </span>
   );
@@ -79,30 +85,25 @@ export default function DepositsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showConfirmationStep, setShowConfirmationStep] = useState(false);
-  <button
-  type="button"
-  onClick={() => setShowConfirmationStep(true)}
-  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
->
-  Review Deposit
-</button>
-
-  
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showConfirmationStep, setShowConfirmationStep] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [showAddSOModal, setShowAddSOModal] = useState(false);
 
   const [selectedDeposit, setSelectedDeposit] = useState<DepositDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Add SO states
+  const [unlinkedSOs, setUnlinkedSOs] = useState<UnlinkedSO[]>([]);
+  const [loadingUnlinked, setLoadingUnlinked] = useState(false);
+  const [selectedSOId, setSelectedSOId] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+
   // Filters
-  const [filters, setFilters] = useState({
-    customer: '',
-    status: '',
-  });
+  const [filters, setFilters] = useState({ customer: '', status: '' });
 
   // Form states
   const [createForm, setCreateForm] = useState({
@@ -121,7 +122,6 @@ export default function DepositsPage() {
     notes: '',
   });
 
-  // Fetch deposits
   useEffect(() => {
     fetchDeposits();
     fetchCustomers();
@@ -166,6 +166,21 @@ export default function DepositsPage() {
     }
   };
 
+  const fetchUnlinkedSOs = async (customerId: string) => {
+    setLoadingUnlinked(true);
+    try {
+      const res = await fetch(`/api/salesorders/unlinked?customer_id=${customerId}`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setUnlinkedSOs(data);
+    } catch (err: any) {
+      console.error(err);
+      setUnlinkedSOs([]);
+    } finally {
+      setLoadingUnlinked(false);
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -182,18 +197,17 @@ export default function DepositsPage() {
           deposit_date: createForm.deposit_date,
         }),
       });
-
       if (!res.ok) throw new Error('Failed to create deposit');
-
       await fetchDeposits();
       setShowCreateModal(false);
+      setShowConfirmationStep(false);
       setCreateForm({
         customer_id: '',
         price_lock_per_m3: '',
         total_do_tagged: '',
         deposit_amount: '',
         notes: '',
-        deposit_date: new Date().toISOString().split('T')[0], 
+        deposit_date: new Date().toISOString().split('T')[0],
       });
     } catch (err: any) {
       setError(err.message);
@@ -205,7 +219,6 @@ export default function DepositsPage() {
   const handleTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDeposit) return;
-
     setLoading(true);
     try {
       const res = await fetch('/api/deposits/payments', {
@@ -219,18 +232,11 @@ export default function DepositsPage() {
           notes: topUpForm.notes,
         }),
       });
-
       if (!res.ok) throw new Error('Failed to add payment');
-
       await fetchDeposits();
       await fetchDepositDetail(selectedDeposit.deposit.id);
       setShowTopUpModal(false);
-      setTopUpForm({
-        amount: '',
-        payment_method: 'Transfer',
-        reference_number: '',
-        notes: '',
-      });
+      setTopUpForm({ amount: '', payment_method: 'Transfer', reference_number: '', notes: '' });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -238,9 +244,53 @@ export default function DepositsPage() {
     }
   };
 
+  const handleLinkSO = async () => {
+    if (!selectedDeposit || !selectedSOId) return;
+    setLinkLoading(true);
+    try {
+      const res = await fetch(`/api/deposits/${selectedDeposit.deposit.id}/so-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sales_order_id: selectedSOId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error);
+      }
+      await fetchDepositDetail(selectedDeposit.deposit.id);
+      await fetchDeposits();
+      setShowAddSOModal(false);
+      setSelectedSOId('');
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLinkLoading(false);
+    }
+  };
 
-  
-  // Filter deposits
+  const handleUnlinkSO = async (soId: string) => {
+  if (!selectedDeposit) return;
+  if (!confirm('Hapus SO ini dari deposit? DO remaining akan bertambah kembali.')) return;
+  try {
+    const res = await fetch(
+      `/api/deposits/${selectedDeposit.deposit.id}/so-link?sales_order_id=${soId}`,
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sales_order_id: soId }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error);
+    }
+    await fetchDepositDetail(selectedDeposit.deposit.id);
+    await fetchDeposits();
+  } catch (err: any) {
+    alert(`Error: ${err.message}`);
+  }
+};
+
   const filteredDeposits = deposits.filter((d) => {
     const matchCustomer = filters.customer
       ? d.customer_name.toLowerCase().includes(filters.customer.toLowerCase())
@@ -249,7 +299,6 @@ export default function DepositsPage() {
     return matchCustomer && matchStatus;
   });
 
-  // Stats
   const totalDeposits = filteredDeposits.length;
   const totalValue = filteredDeposits.reduce((sum, d) => sum + d.deposit_amount, 0);
   const totalUsed = filteredDeposits.reduce((sum, d) => sum + d.amount_used, 0);
@@ -269,7 +318,7 @@ export default function DepositsPage() {
         </button>
       </div>
 
-      {/* STATS OVERVIEW */}
+      {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Total Deposits</p>
@@ -277,21 +326,15 @@ export default function DepositsPage() {
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
-          <p className="text-xl font-bold text-gray-800">
-            Rp {(totalValue / 1000000).toFixed(1)}JT
-          </p>
+          <p className="text-xl font-bold text-gray-800">Rp {(totalValue / 1000000).toFixed(1)}JT</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Used</p>
-          <p className="text-xl font-bold text-gray-800">
-            Rp {(totalUsed / 1000000).toFixed(1)}JT
-          </p>
+          <p className="text-xl font-bold text-gray-800">Rp {(totalUsed / 1000000).toFixed(1)}JT</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Remaining</p>
-          <p className="text-xl font-bold text-gray-800">
-            Rp {(totalRemaining / 1000000).toFixed(1)}JT
-          </p>
+          <p className="text-xl font-bold text-gray-800">Rp {(totalRemaining / 1000000).toFixed(1)}JT</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-teal-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Active</p>
@@ -320,45 +363,11 @@ export default function DepositsPage() {
         </select>
       </div>
 
-      {/* ERROR */}
       {error && (
         <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {error}
         </div>
       )}
-      
-
-      {showConfirmationStep && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-      <h2 className="text-2xl font-bold mb-4">Confirm New Deposit</h2>
-      <div className="space-y-2">
-        <p><strong>Supplier:</strong> {customers.find(c => c.id === createForm.customer_id)?.name}</p>
-        <p><strong>Deposit Date:</strong> {createForm.deposit_date}</p>
-        <p><strong>Harga Lock:</strong> Rp {parseFloat(createForm.price_lock_per_m3 || '0').toLocaleString('id-ID')}/m³</p>
-        <p><strong>Total DO Tagged:</strong> {createForm.total_do_tagged}</p>
-        <p><strong>Initial Deposit:</strong> Rp {parseFloat(createForm.deposit_amount || '0').toLocaleString('id-ID')}</p>
-        {createForm.notes && <p><strong>Notes:</strong> {createForm.notes}</p>}
-      </div>
-
-      <div className="flex justify-end gap-2 mt-6">
-        <button
-          onClick={() => setShowConfirmationStep(false)}
-          className="px-4 py-2 border rounded hover:bg-gray-100"
-        >
-          Back
-        </button>
-        <button
-          onClick={handleCreate} // ini baru beneran create
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Confirm & Create
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
 
       {/* TABLE */}
       <div className="overflow-x-auto bg-white shadow rounded-lg">
@@ -384,15 +393,11 @@ export default function DepositsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={13} className="p-5 text-center text-gray-400">
-                  Loading...
-                </td>
+                <td colSpan={14} className="p-5 text-center text-gray-400">Loading...</td>
               </tr>
             ) : filteredDeposits.length === 0 ? (
               <tr>
-                <td colSpan={13} className="p-5 text-center text-gray-400">
-                  No deposits found
-                </td>
+                <td colSpan={14} className="p-5 text-center text-gray-400">No deposits found</td>
               </tr>
             ) : (
               filteredDeposits.map((d, index) => (
@@ -401,54 +406,35 @@ export default function DepositsPage() {
                   <td className="p-3">{d.deposit_date}</td>
                   <td className="p-3 font-semibold text-blue-600">{d.deposit_code}</td>
                   <td className="p-3">{d.customer_name}</td>
-                  <td className="p-3 text-right">
-                    Rp {d.price_lock_per_m3.toLocaleString('id-ID')}
-                  </td>
+                  <td className="p-3 text-right">Rp {d.price_lock_per_m3.toLocaleString('id-ID')}</td>
                   <td className="p-3 text-right">{d.total_do_tagged}</td>
                   <td className="p-3 text-right">{d.do_used}</td>
-                  <td className="p-3 text-right font-semibold text-green-600">
-                    {d.do_remaining}
-                  </td>
-                  <td className="p-3 text-right">
-                    Rp {d.deposit_amount.toLocaleString('id-ID')}
-                  </td>
-                  <td className="p-3 text-right text-orange-600">
-                    Rp {d.amount_used.toLocaleString('id-ID')}
-                  </td>
-                  <td className="p-3 text-right font-semibold text-green-600">
-                    Rp {d.amount_remaining.toLocaleString('id-ID')}
-                  </td>
+                  <td className="p-3 text-right font-semibold text-green-600">{d.do_remaining}</td>
+                  <td className="p-3 text-right">Rp {d.deposit_amount.toLocaleString('id-ID')}</td>
+                  <td className="p-3 text-right text-orange-600">Rp {d.amount_used.toLocaleString('id-ID')}</td>
+                  <td className="p-3 text-right font-semibold text-green-600">Rp {d.amount_remaining.toLocaleString('id-ID')}</td>
                   <td className="p-3 text-center">{d.so_count}</td>
-                  <td className="p-3 text-center">
-                    <StatusBadge status={d.status} />
-                  </td>
+                  <td className="p-3 text-center"><StatusBadge status={d.status} /></td>
                   <td className="p-3 text-center">
                     <div className="flex flex-col gap-1">
-                      <button
-                        onClick={() => fetchDepositDetail(d.id)}
-                        className="text-blue-600 hover:underline"
-                      >
+                      <button onClick={() => fetchDepositDetail(d.id)} className="text-blue-600 hover:underline text-sm">
                         Detail
                       </button>
                       {d.status === 'active' && (
                         <button
-                          onClick={() => {
-                            fetchDepositDetail(d.id);
-                            setShowTopUpModal(true);
-                          }}
-                          className="text-green-600 hover:underline"
+                          onClick={() => { fetchDepositDetail(d.id); setShowTopUpModal(true); }}
+                          className="text-green-600 hover:underline text-sm"
                         >
                           Top Up
                         </button>
                       )}
                       <button
                         onClick={() => router.push(`/deposits/payment-receipt?deposit_id=${d.id}`)}
-                        className="text-purple-600 hover:underline"
+                        className="text-purple-600 hover:underline text-sm"
                       >
                         Tanda Terima
                       </button>
                     </div>
-                
                   </td>
                 </tr>
               ))
@@ -457,28 +443,25 @@ export default function DepositsPage() {
         </table>
       </div>
 
-      {/* CREATE MODAL */}
-      {showCreateModal && (
+      {/* ===================== CREATE MODAL ===================== */}
+      {showCreateModal && !showConfirmationStep && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
             <h2 className="text-2xl font-bold mb-4">Create New Deposit</h2>
-            <form onSubmit={handleCreate}>
+            <form onSubmit={(e) => { e.preventDefault(); setShowConfirmationStep(true); }}>
               <div className="space-y-4">
                 <div>
-  <label className="block text-sm font-medium mb-1">
-    Deposit Date <span className="text-red-500">*</span>
-  </label>
-  <input
-    type="date"
-    required
-    value={createForm.deposit_date}
-    onChange={(e) =>
-      setCreateForm({ ...createForm, deposit_date: e.target.value })
-    }
-    className="w-full border rounded px-3 py-2"
-  />
-</div>
-
+                  <label className="block text-sm font-medium mb-1">
+                    Deposit Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={createForm.deposit_date}
+                    onChange={(e) => setCreateForm({ ...createForm, deposit_date: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Supplier <span className="text-red-500">*</span>
@@ -486,20 +469,15 @@ export default function DepositsPage() {
                   <select
                     required
                     value={createForm.customer_id}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, customer_id: e.target.value })
-                    }
+                    onChange={(e) => setCreateForm({ ...createForm, customer_id: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                   >
                     <option value="">Select Supplier</option>
                     {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Harga Lock (per m³) <span className="text-red-500">*</span>
@@ -508,14 +486,11 @@ export default function DepositsPage() {
                     type="number"
                     required
                     value={createForm.price_lock_per_m3}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, price_lock_per_m3: e.target.value })
-                    }
+                    onChange={(e) => setCreateForm({ ...createForm, price_lock_per_m3: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     placeholder="400000"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Total DO to Tag <span className="text-red-500">*</span>
@@ -524,46 +499,33 @@ export default function DepositsPage() {
                     type="number"
                     required
                     value={createForm.total_do_tagged}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, total_do_tagged: e.target.value })
-                    }
+                    onChange={(e) => setCreateForm({ ...createForm, total_do_tagged: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     placeholder="10"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Initial Deposit Amount (Optional)
-                  </label>
+                  <label className="block text-sm font-medium mb-1">Initial Deposit Amount (Optional)</label>
                   <input
                     type="number"
                     value={createForm.deposit_amount}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, deposit_amount: e.target.value })
-                    }
+                    onChange={(e) => setCreateForm({ ...createForm, deposit_amount: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     placeholder="50000000"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Bisa diisi nanti via Top Up
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Bisa diisi nanti via Top Up</p>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">Notes</label>
                   <textarea
                     value={createForm.notes}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, notes: e.target.value })
-                    }
+                    onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     rows={3}
                     placeholder="Optional notes..."
                   />
                 </div>
               </div>
-
               <div className="flex justify-end gap-2 mt-6">
                 <button
                   type="button"
@@ -574,10 +536,9 @@ export default function DepositsPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                  {loading ? 'Creating...' : 'Create Deposit'}
+                  Review →
                 </button>
               </div>
             </form>
@@ -585,18 +546,47 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* DETAIL MODAL */}
+      {/* ===================== CONFIRMATION MODAL ===================== */}
+      {showConfirmationStep && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 className="text-2xl font-bold mb-4">Confirm New Deposit</h2>
+            <div className="space-y-2 text-sm">
+              <p><strong>Supplier:</strong> {customers.find((c) => c.id === createForm.customer_id)?.name}</p>
+              <p><strong>Deposit Date:</strong> {createForm.deposit_date}</p>
+              <p><strong>Harga Lock:</strong> Rp {parseFloat(createForm.price_lock_per_m3 || '0').toLocaleString('id-ID')}/m³</p>
+              <p><strong>Total DO Tagged:</strong> {createForm.total_do_tagged}</p>
+              <p><strong>Initial Deposit:</strong> Rp {parseFloat(createForm.deposit_amount || '0').toLocaleString('id-ID')}</p>
+              {createForm.notes && <p><strong>Notes:</strong> {createForm.notes}</p>}
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowConfirmationStep(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                ← Back
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Creating...' : 'Confirm & Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== DETAIL MODAL ===================== */}
       {showDetailModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-2xl font-bold">
                 Deposit Detail: {selectedDeposit.deposit.deposit_code}
               </h2>
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
+              <button onClick={() => setShowDetailModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">
                 ✕
               </button>
             </div>
@@ -613,30 +603,22 @@ export default function DepositsPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Harga Lock</p>
-                <p className="font-semibold">
-                  Rp {selectedDeposit.deposit.price_lock_per_m3.toLocaleString('id-ID')}/m³
-                </p>
+                <p className="font-semibold">Rp {selectedDeposit.deposit.price_lock_per_m3.toLocaleString('id-ID')}/m³</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">DO Tagged</p>
                 <p className="font-semibold">
                   {selectedDeposit.deposit.do_used} / {selectedDeposit.deposit.total_do_tagged}
-                  <span className="text-green-600 ml-2">
-                    ({selectedDeposit.deposit.do_remaining} remaining)
-                  </span>
+                  <span className="text-green-600 ml-2">({selectedDeposit.deposit.do_remaining} remaining)</span>
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Deposit Amount</p>
-                <p className="font-semibold">
-                  Rp {selectedDeposit.deposit.deposit_amount.toLocaleString('id-ID')}
-                </p>
+                <p className="font-semibold">Rp {selectedDeposit.deposit.deposit_amount.toLocaleString('id-ID')}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Amount Remaining</p>
-                <p className="font-semibold text-green-600">
-                  Rp {selectedDeposit.deposit.amount_remaining.toLocaleString('id-ID')}
-                </p>
+                <p className="font-semibold text-green-600">Rp {selectedDeposit.deposit.amount_remaining.toLocaleString('id-ID')}</p>
               </div>
             </div>
 
@@ -646,28 +628,24 @@ export default function DepositsPage() {
               {selectedDeposit.payments.length === 0 ? (
                 <p className="text-gray-400 text-sm">No payments yet</p>
               ) : (
-                <table className="w-full border">
+                <table className="w-full border text-sm">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="p-2 text-left text-sm">Date</th>
-                      <th className="p-2 text-right text-sm">Amount</th>
-                      <th className="p-2 text-left text-sm">Method</th>
-                      <th className="p-2 text-left text-sm">Ref</th>
-                      <th className="p-2 text-left text-sm">Notes</th>
+                      <th className="p-2 text-left">Date</th>
+                      <th className="p-2 text-right">Amount</th>
+                      <th className="p-2 text-left">Method</th>
+                      <th className="p-2 text-left">Ref</th>
+                      <th className="p-2 text-left">Notes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedDeposit.payments.map((p) => (
                       <tr key={p.id} className="border-b">
-                        <td className="p-2 text-sm">
-                          {new Date(p.payment_date).toLocaleDateString('id-ID')}
-                        </td>
-                        <td className="p-2 text-right text-sm font-semibold">
-                          Rp {p.amount.toLocaleString('id-ID')}
-                        </td>
-                        <td className="p-2 text-sm">{p.payment_method}</td>
-                        <td className="p-2 text-sm">{p.reference_number || '-'}</td>
-                        <td className="p-2 text-sm">{p.notes || '-'}</td>
+                        <td className="p-2">{new Date(p.payment_date).toLocaleDateString('id-ID')}</td>
+                        <td className="p-2 text-right font-semibold">Rp {p.amount.toLocaleString('id-ID')}</td>
+                        <td className="p-2">{p.payment_method}</td>
+                        <td className="p-2">{p.reference_number || '-'}</td>
+                        <td className="p-2">{p.notes || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -677,46 +655,67 @@ export default function DepositsPage() {
 
             {/* SO USAGES */}
             <div>
-              <h3 className="text-lg font-bold mb-2">Sales Order Usage</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-bold">Sales Order Usage</h3>
+                {selectedDeposit.deposit.status === 'active' && (
+                  <button
+                    onClick={() => {
+                      setShowAddSOModal(true);
+                      fetchUnlinkedSOs(selectedDeposit.deposit.customer_id);
+                    }}
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                  >
+                    + Tambah SO
+                  </button>
+                )}
+              </div>
+
               {selectedDeposit.usages.length === 0 ? (
                 <p className="text-gray-400 text-sm">No SO using this deposit yet</p>
               ) : (
-                <table className="w-full border">
+                <table className="w-full border text-sm">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="p-2 text-left text-sm">SO Number</th>
-                      <th className="p-2 text-left text-sm">Order Date</th>
-                    <th className="p-2 text-left text-sm">SJ Number</th>
-                    <th className="p-2 text-left text-sm">Delivery Date</th>
-                      <th className="p-2 text-left text-sm">Ship To</th>
-                      <th className="p-2 text-right text-sm">DO Count</th>
-                      <th className="p-2 text-right text-sm">Amount Used</th>
-                      <th className="p-2 text-center text-sm">Status</th>
+                      <th className="p-2 text-left">SO Number</th>
+                      <th className="p-2 text-left">Order Date</th>
+                      <th className="p-2 text-left">SJ Number</th>
+                      <th className="p-2 text-left">Delivery Date</th>
+                      <th className="p-2 text-left">Ship To</th>
+                      <th className="p-2 text-right">DO Count</th>
+                      <th className="p-2 text-right">Amount Used</th>
+                      <th className="p-2 text-center">Status</th>
+                      {selectedDeposit.deposit.status === 'active' && (
+                        <th className="p-2 text-center">Aksi</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {selectedDeposit.usages.map((u) => (
                       <tr key={u.id} className="border-b">
-                        <td className="p-2 text-sm font-semibold">
-                          {u.sales_order.so_number}
+                        <td className="p-2 font-semibold">{u.sales_order.so_number}</td>
+                        <td className="p-2">{new Date(u.sales_order.order_date).toLocaleDateString('id-ID')}</td>
+                        <td className="p-2 font-semibold text-blue-600">{u.sj_number}</td>
+                        <td className="p-2">
+                          {u.delivery_date && u.delivery_date !== '-'
+                            ? new Date(u.delivery_date).toLocaleDateString('id-ID')
+                            : '-'}
                         </td>
-                        <td className="p-2 text-sm">
-                          {new Date(u.sales_order.order_date).toLocaleDateString('id-ID')}
-                        </td>
-                        <td className="p-2 text-sm font-semibold text-blue-600">
-                          {u.sj_number}
-                        </td>
-                        <td className="p-2 text-sm">
-                          {new Date(u.delivery_date).toLocaleDateString('id-ID')}
-                        </td>
-                        <td className="p-2 text-sm">{u.sales_order.ship_to_name}</td>
-                        <td className="p-2 text-right text-sm">{u.do_count}</td>
-                        <td className="p-2 text-right text-sm">
-                          Rp {u.amount_used.toLocaleString('id-ID')}
-                        </td>
-                        <td className="p-2 text-center text-sm">
+                        <td className="p-2">{u.sales_order.ship_to_name || '-'}</td>
+                        <td className="p-2 text-right">{u.do_count}</td>
+                        <td className="p-2 text-right">Rp {u.amount_used.toLocaleString('id-ID')}</td>
+                        <td className="p-2 text-center">
                           <StatusBadge status={u.sales_order.status} />
                         </td>
+                        {selectedDeposit.deposit.status === 'active' && (
+                          <td className="p-2 text-center">
+                            <button
+                              onClick={() => handleUnlinkSO(u.sales_order.id)}
+                              className="text-red-500 hover:text-red-700 text-xs font-medium"
+                            >
+                              Hapus
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -744,9 +743,58 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* TOP UP MODAL */}
+      {/* ===================== ADD SO MODAL ===================== */}
+      {showAddSOModal && selectedDeposit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h2 className="text-xl font-bold mb-1">Tambah SO ke Deposit</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Pilih SO milik <strong>{selectedDeposit.deposit.customer_name}</strong> yang belum terhubung ke deposit manapun.
+            </p>
+
+            {loadingUnlinked ? (
+              <p className="text-gray-400 text-sm py-4 text-center">Loading...</p>
+            ) : unlinkedSOs.length === 0 ? (
+              <p className="text-gray-400 text-sm py-4 text-center">
+                Tidak ada SO yang tersedia untuk ditambahkan.
+              </p>
+            ) : (
+              <select
+                value={selectedSOId}
+                onChange={(e) => setSelectedSOId(e.target.value)}
+                className="w-full border rounded px-3 py-2 mb-4"
+              >
+                <option value="">-- Pilih SO --</option>
+                {unlinkedSOs.map((so) => (
+                  <option key={so.id} value={so.id}>
+                    {so.so_number} — {so.ship_to_name || '-'} ({new Date(so.order_date).toLocaleDateString('id-ID')}) [{so.status}]
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setShowAddSOModal(false); setSelectedSOId(''); }}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleLinkSO}
+                disabled={!selectedSOId || linkLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {linkLoading ? 'Menyimpan...' : 'Tambah SO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== TOP UP MODAL ===================== */}
       {showTopUpModal && selectedDeposit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
             <h2 className="text-2xl font-bold mb-4">
               Top Up Deposit: {selectedDeposit.deposit.deposit_code}
@@ -761,21 +809,16 @@ export default function DepositsPage() {
                     type="number"
                     required
                     value={topUpForm.amount}
-                    onChange={(e) =>
-                      setTopUpForm({ ...topUpForm, amount: e.target.value })
-                    }
+                    onChange={(e) => setTopUpForm({ ...topUpForm, amount: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     placeholder="30000000"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">Payment Method</label>
                   <select
                     value={topUpForm.payment_method}
-                    onChange={(e) =>
-                      setTopUpForm({ ...topUpForm, payment_method: e.target.value })
-                    }
+                    onChange={(e) => setTopUpForm({ ...topUpForm, payment_method: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                   >
                     <option value="Transfer">Transfer</option>
@@ -783,36 +826,27 @@ export default function DepositsPage() {
                     <option value="Check">Check</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Reference Number
-                  </label>
+                  <label className="block text-sm font-medium mb-1">Reference Number</label>
                   <input
                     type="text"
                     value={topUpForm.reference_number}
-                    onChange={(e) =>
-                      setTopUpForm({ ...topUpForm, reference_number: e.target.value })
-                    }
+                    onChange={(e) => setTopUpForm({ ...topUpForm, reference_number: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     placeholder="REF-12345"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">Notes</label>
                   <textarea
                     value={topUpForm.notes}
-                    onChange={(e) =>
-                      setTopUpForm({ ...topUpForm, notes: e.target.value })
-                    }
+                    onChange={(e) => setTopUpForm({ ...topUpForm, notes: e.target.value })}
                     className="w-full border rounded px-3 py-2"
                     rows={2}
                     placeholder="Optional notes..."
                   />
                 </div>
               </div>
-
               <div className="flex justify-end gap-2 mt-6">
                 <button
                   type="button"

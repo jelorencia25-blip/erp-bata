@@ -164,17 +164,17 @@ const supabase = createClient(
 
     // 🔹 6. Update status SO
     // 🔹 6. Update status SO (JANGAN override cancelled)
-if (so.status === "confirmed" || so.status === "approved") {
+if (so.status !== "cancelled") {
   const { error: updateSOError } = await supabase
     .from("sales_orders")
     .update({ status: "in_delivery" })
     .eq("id", sales_order_id);
 
-    if (updateSOError) {
-      console.error("❌ Update SO Error:", updateSOError);
-      throw updateSOError;
-    }
+  if (updateSOError) {
+    console.error("❌ Update SO Error:", updateSOError);
+    throw updateSOError;
   }
+}
     console.log("✅ SO status updated");
 
     return NextResponse.json({
