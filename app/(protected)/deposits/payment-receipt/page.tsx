@@ -319,7 +319,7 @@ export default function DepositPaymentReceiptPage() {
                     </select>
                   </div>
                   <div className="print:block uppercase">
-                    tranfer ke rek {selectedBank?.bank_name}{' '}
+                    transfer ke rek {selectedBank?.bank_name}{' '}
                     {selectedBank?.account_number} A/N {selectedBank?.account_holder}
                   </div>
                 </td>
