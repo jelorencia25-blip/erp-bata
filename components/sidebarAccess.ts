@@ -50,6 +50,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
     "Dashboard",
     "Raw Orders",
     "Sales Orders",
+    "Deliveries",
     "Invoices",
     "Returns",
     "Payments",

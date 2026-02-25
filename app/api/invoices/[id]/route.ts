@@ -1,9 +1,8 @@
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// GET method - existing code (keep as is)
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,39 +22,32 @@ export async function GET(
       );
     }
 
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-    if (!uuidRegex.test(deliveryId)) {
-      return NextResponse.json(
-        { error: "Invalid UUID format", receivedId: deliveryId },
-        { status: 400 }
-      );
-    }
-
     // ===============================
     // 1️⃣ DELIVERY ORDER
     // ===============================
     const { data: delivery, error: deliveryError } = await supabaseAdmin
       .from("delivery_orders")
-      .select("id, sj_number, delivery_date, sales_order_id, bank_account_id")
+      .select(
+        "id, sj_number, delivery_date, sales_order_id, bank_account_id"
+      )
       .eq("id", deliveryId)
       .single();
 
     if (deliveryError) throw deliveryError;
-    if (!delivery) {
+    if (!delivery)
       return NextResponse.json(
         { error: "Delivery tidak ditemukan" },
         { status: 404 }
       );
-    }
 
     // ===============================
     // 2️⃣ SALES ORDER
     // ===============================
     const { data: salesOrder } = await supabaseAdmin
       .from("sales_orders")
-      .select("so_number, order_date, delivery_address, customer_id, ship_to_name, customer_order_ref")
+      .select(
+        "so_number, order_date, delivery_address, customer_id, ship_to_name, customer_order_ref"
+      )
       .eq("id", delivery.sales_order_id)
       .single();
 
@@ -73,59 +65,28 @@ export async function GET(
     }
 
     // ===============================
-    // 3.5️⃣ BANK ACCOUNT (if saved)
+    // 4️⃣ BANK ACCOUNT
     // ===============================
     let bankAccountDetails = null;
     if (delivery.bank_account_id) {
-      const { data: bankData } = await supabaseAdmin
+      const { data } = await supabaseAdmin
         .from("bank_accounts")
         .select("id, bank_name, account_number, account_holder")
         .eq("id", delivery.bank_account_id)
         .single();
-      
-      if (bankData) {
-        bankAccountDetails = bankData;
-      }
+
+      bankAccountDetails = data ?? null;
     }
 
     // ===============================
-    // 4️⃣ SALES ORDER ITEMS (PRIMARY SOURCE)
+    // 5️⃣ SO ITEMS (SOURCE OF TRUTH)
     // ===============================
     const { data: soItems } = await supabaseAdmin
       .from("sales_order_items")
-      .select("id, product_id, pallet_qty, total_pcs, price_per_m3, total_m3, total_price")
+      .select(
+        "id, product_id, pallet_qty, total_pcs, price_per_m3, total_m3, total_price"
+      )
       .eq("sales_order_id", delivery.sales_order_id);
-
-    // ===============================
-    // 5️⃣ DELIVERY ITEMS (hanya untuk retur cross-check)
-    // ===============================
-    const { data: deliveryItems } = await supabaseAdmin
-      .from("delivery_items")
-      .select("product_id, pallet_qty, total_pcs")
-      .eq("delivery_order_id", deliveryId);
-
-    // ===============================
-    // 🚨 KALAU KEDUA SUMBER KOSONG
-    // ===============================
-    if ((!soItems || soItems.length === 0) && (!deliveryItems || deliveryItems.length === 0)) {
-      return NextResponse.json({
-        invoice_number: `INV-${delivery.sj_number}`,
-        sj_number: delivery.sj_number,
-        transaction_date: delivery.delivery_date || salesOrder?.order_date || new Date(),
-        so_number: salesOrder?.so_number ?? "-",
-        kepada: customerName,
-        ship_to_name: salesOrder?.ship_to_name ?? "-",
-        alamat: salesOrder?.delivery_address ?? "-",
-        bank_account_id: delivery.bank_account_id || null,
-        bank_account: bankAccountDetails,
-        items: [],
-        subtotal_pembelian: 0,
-        total_retur_pcs: 0,
-        total_retur: 0,
-        total_tagihan: 0,
-        _warning: "Tidak ada data items di sales_order_items maupun delivery_items. Silakan input items terlebih dahulu."
-      });
-    }
 
     // ===============================
     // 6️⃣ RETURN ITEMS
@@ -136,37 +97,71 @@ export async function GET(
       .eq("delivery_order_id", deliveryId);
 
     // ===============================
-    // 7️⃣ ENRICH ITEMS
+    // 🚨 Kalau kosong semua
     // ===============================
-    const sourceItems = (soItems && soItems.length > 0) ? soItems : deliveryItems;
-    const itemSource = (soItems && soItems.length > 0) ? "sales_order" : "delivery";
+    if (!soItems || soItems.length === 0) {
+      return NextResponse.json({
+        invoice_number: `INV-${delivery.sj_number}`,
+        sj_number: delivery.sj_number,
+        transaction_date:
+          delivery.delivery_date ||
+          salesOrder?.order_date ||
+          new Date(),
+        so_number: salesOrder?.so_number ?? "-",
+        kepada: customerName,
+        alamat: salesOrder?.delivery_address ?? "-",
+        items: [],
+        subtotal_pembelian: 0,
+        total_retur_pcs: 0,
+        total_retur: 0,
+        total_tagihan: 0,
+      });
+    }
+
+    // ===============================
+    // 7️⃣ GABUNGKAN PRODUCT ID SO + RETURN
+    // ===============================
+    const productIds = new Set([
+      ...(soItems?.map((i) => i.product_id) ?? []),
+      ...(returItemsRaw?.map((r) => r.product_id) ?? []),
+    ]);
 
     const enrichedItems = await Promise.all(
-      (sourceItems || []).map(async (item) => {
+      Array.from(productIds).map(async (productId) => {
+        const soItem = soItems?.find(
+          (i) => i.product_id === productId
+        );
+
+        const returnItem = returItemsRaw?.find(
+          (r) => r.product_id === productId
+        );
+
         const { data: product } = await supabaseAdmin
           .from("products")
           .select("name, ukuran, isi_per_palet")
-          .eq("id", item.product_id)
+          .eq("id", productId)
           .single();
 
-        const returnItem = returItemsRaw?.find(
-          (r) => r.product_id === item.product_id
-        );
-
-        // ✅ FIX: Semua pakai SO sebagai source of truth
-        const actualPcs = item.total_pcs ?? 0;
-        const actualPalet = item.pallet_qty ?? 0;
-        
-        // ✅ Retur tetap dari delivery_return_items
+        const actualPcs = soItem?.total_pcs ?? 0;
+        const actualPalet = soItem?.pallet_qty ?? 0;
         const returnPcs = returnItem?.return_pcs ?? 0;
 
-        // ✅ FIX: Harga satuan pakai total_pcs dari SO
         let hargaSatuan = 0;
-        if ((item as any).total_price && (item as any).total_pcs > 0) {
-          hargaSatuan = Math.round((item as any).total_price / (item as any).total_pcs);
-        } else if ((item as any).price_per_m3 && (item as any).total_m3 && (item as any).total_pcs > 0) {
-          const totalHarga = (item as any).price_per_m3 * (item as any).total_m3;
-          hargaSatuan = Math.round(totalHarga / (item as any).total_pcs);
+
+        if (soItem?.total_price && soItem.total_pcs > 0) {
+          hargaSatuan = Math.round(
+            soItem.total_price / soItem.total_pcs
+          );
+        } else if (
+          soItem?.price_per_m3 &&
+          soItem?.total_m3 &&
+          soItem.total_pcs > 0
+        ) {
+          const totalHarga =
+            soItem.price_per_m3 * soItem.total_m3;
+          hargaSatuan = Math.round(
+            totalHarga / soItem.total_pcs
+          );
         }
 
         const jumlah = actualPcs * hargaSatuan;
@@ -188,39 +183,44 @@ export async function GET(
     // 8️⃣ HITUNG TOTAL
     // ===============================
     const subtotal = enrichedItems.reduce(
-      (s, i) => s + (i.jumlah ?? 0),
+      (s, i) => s + i.jumlah,
       0
     );
 
     const totalReturPcs = enrichedItems.reduce(
-      (s, i) => s + (i.return_pcs ?? 0),
+      (s, i) => s + i.return_pcs,
       0
     );
 
-    const totalReturRupiah = enrichedItems.reduce((sum, item) => {
-      return sum + (item.return_pcs * item.harga_satuan);
-    }, 0);
+    const totalReturRupiah = enrichedItems.reduce(
+      (s, i) => s + i.return_pcs * i.harga_satuan,
+      0
+    );
+
+    const totalTagihan = subtotal - totalReturRupiah;
 
     // ===============================
-    // 9️⃣ RESPONSE FINAL
+    // 9️⃣ FINAL RESPONSE
     // ===============================
     return NextResponse.json({
       invoice_number: `INV-${delivery.sj_number}`,
       sj_number: delivery.sj_number,
-      transaction_date: delivery.delivery_date || salesOrder?.order_date || new Date(),
+      transaction_date:
+        delivery.delivery_date ||
+        salesOrder?.order_date ||
+        new Date(),
       so_number: salesOrder?.so_number ?? "-",
       supplier_name: customerName,
       kepada: salesOrder?.ship_to_name ?? "-",
       customer_ref: salesOrder?.customer_order_ref ?? "-",
       alamat: salesOrder?.delivery_address ?? "-",
-      bank_account_id: delivery.bank_account_id || null,
+      bank_account_id: delivery.bank_account_id ?? null,
       bank_account: bankAccountDetails,
       items: enrichedItems,
       subtotal_pembelian: subtotal,
       total_retur_pcs: totalReturPcs,
       total_retur: totalReturRupiah,
-      total_tagihan: subtotal - totalReturRupiah,
-      _item_source: itemSource,
+      total_tagihan: totalTagihan,
     });
 
   } catch (err: any) {
@@ -233,7 +233,7 @@ export async function GET(
 }
 
 // ===============================
-// 🆕 PATCH METHOD - UPDATE INVOICE
+// PATCH
 // ===============================
 export async function PATCH(
   req: NextRequest,
@@ -248,46 +248,28 @@ export async function PATCH(
     const { id: deliveryId } = await params;
     const body = await req.json();
 
-    if (!deliveryId) {
-      return NextResponse.json(
-        { error: "Invalid delivery ID" },
-        { status: 400 }
-      );
-    }
-
     const { transaction_date, bank_account_id } = body;
 
-    // ===============================
-    // 1️⃣ UPDATE DELIVERY ORDER
-    // ===============================
     const updateData: any = {};
 
-    if (transaction_date) {
+    if (transaction_date)
       updateData.delivery_date = transaction_date;
-    }
 
-    if (bank_account_id) {
+    if (bank_account_id)
       updateData.bank_account_id = bank_account_id;
-    }
 
-    // Update delivery order
     if (Object.keys(updateData).length > 0) {
-      const { error: updateError } = await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from("delivery_orders")
         .update(updateData)
         .eq("id", deliveryId);
 
-      if (updateError) {
-        console.error("Update error:", updateError);
-        throw updateError;
-      }
+      if (error) throw error;
     }
 
-    // ===============================
-    // 2️⃣ RETURN UPDATED DATA
-    // ===============================
-    const getResponse = await GET(req, { params: Promise.resolve({ id: deliveryId }) });
-    return getResponse;
+    return GET(req, {
+      params: Promise.resolve({ id: deliveryId }),
+    });
 
   } catch (err: any) {
     console.error("UPDATE INVOICE ERROR:", err);
