@@ -39,6 +39,11 @@ export default function DeliveriesPage() {
 
   // SEARCH
   const [search, setSearch] = useState("");
+  // FILTER TAMBAHAN
+const [filterSO, setFilterSO] = useState("");
+const [filterAction, setFilterAction] = useState<
+  "all" | "done" | "final"
+>("all");
 
   // SORT
   const [sortKey, setSortKey] = useState<SortKey>("so_number");
@@ -85,36 +90,48 @@ export default function DeliveriesPage() {
 
   // FILTER + SORT
   const filteredAndSortedData = useMemo(() => {
-    const keyword = search.toLowerCase();
+  const keyword = search.toLowerCase();
 
-    const filtered = data.filter(row =>
+  const filtered = data.filter(row => {
+    const matchSearch =
       row.sj_number?.toLowerCase().includes(keyword) ||
       row.pelanggan?.toLowerCase().includes(keyword) ||
       row.kepada?.toLowerCase().includes(keyword) ||
       row.supir?.toLowerCase().includes(keyword) ||
-      row.plat_mobil?.toLowerCase().includes(keyword)
-    );
+      row.plat_mobil?.toLowerCase().includes(keyword);
 
-    const sorted = [...filtered];
+    const matchSO =
+      filterSO === "" ||
+      row.so_number?.toLowerCase().includes(filterSO.toLowerCase());
 
-    sorted.sort((a: any, b: any) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
+    const matchAction =
+      filterAction === "all" ||
+      (filterAction === "final" && row.final_status === "final") ||
+      (filterAction === "done" && row.final_status === "draft");
 
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
+    return matchSearch && matchSO && matchAction;
+  });
 
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortDir === "asc" ? aVal - bVal : bVal - aVal;
-      }
+  const sorted = [...filtered];
 
-      return sortDir === "asc"
-        ? String(aVal).localeCompare(String(bVal))
-        : String(bVal).localeCompare(String(aVal));
-    });
+  sorted.sort((a: any, b: any) => {
+    const aVal = a[sortKey];
+    const bVal = b[sortKey];
 
-    return sorted;
-  }, [data, search, sortKey, sortDir]);
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    }
+
+    return sortDir === "asc"
+      ? String(aVal).localeCompare(String(aVal))
+      : String(bVal).localeCompare(String(aVal));
+  });
+
+  return sorted;
+}, [data, search, filterSO, filterAction, sortKey, sortDir]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -194,14 +211,36 @@ export default function DeliveriesPage() {
 </div>
 
       {/* SEARCH */}
-      <div className="mb-3">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Cari No SJ, Supplier, Kepada, Supir, Plat..."
-          className="w-full border rounded px-3 py-2 text-sm"
-        />
-      </div>
+     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+
+  {/* SEARCH */}
+  <input
+    value={search}
+    onChange={e => setSearch(e.target.value)}
+    placeholder="Cari No SJ, Supplier, Kepada, Supir, Plat..."
+    className="border rounded px-3 py-2 text-sm"
+  />
+
+  {/* FILTER SO */}
+  <input
+    value={filterSO}
+    onChange={e => setFilterSO(e.target.value)}
+    placeholder="Filter No SO..."
+    className="border rounded px-3 py-2 text-sm"
+  />
+
+  {/* FILTER ACTION */}
+  <select
+    value={filterAction}
+    onChange={e => setFilterAction(e.target.value as any)}
+    className="border rounded px-3 py-2 text-sm"
+  >
+    <option value="all">Semua Status</option>
+    <option value="done">DONE (Belum Final)</option>
+    <option value="final">FINAL</option>
+  </select>
+
+</div>
 
       {/* TABLE */}
       <div className="bg-white rounded shadow overflow-x-auto">
@@ -244,7 +283,16 @@ export default function DeliveriesPage() {
             )}
 
             {filteredAndSortedData.map(row => (
-              <tr key={row.id} className="border-t">
+              <tr
+  key={row.id}
+  className={`border-t ${
+    row.final_status === "final"
+      ? "bg-green-100"
+      : tab === "processed"
+      ? "bg-yellow-100"
+      : ""
+  }`}
+>
                 <td className="p-3 text-center">
                   {tab === "processed" &&
                     (row.final_status === "draft" ? (

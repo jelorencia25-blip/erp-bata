@@ -72,10 +72,12 @@ export default function SalesOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({
-    customer_name: '',
-    order_date: '',
-    status: '',
-  });
+  customer_name: '',
+  order_date: '',
+  status: '',
+  so_number: '',
+  sj_number: '',
+});
 
   const [sortConfig, setSortConfig] = useState<{ key: keyof SalesOrder; direction: 'asc' | 'desc' } | null>(null);
 
@@ -101,16 +103,20 @@ export default function SalesOrdersPage() {
 
   // Filtered Orders
   let filteredOrders = orders.filter((o) => {
-    const customerName = o.customer_name || '';
-    const orderDate = o.order_date || '';
-    const status = o.status || '';
+  const customerName = o.customer_name || '';
+  const orderDate = o.order_date || '';
+  const status = o.status || '';
+  const soNumber = o.so_number || '';
+  const sjNumber = o.sj_numbers || '';
 
-    return (
-      customerName.toLowerCase().includes(filters.customer_name.toLowerCase()) &&
-      (filters.order_date ? orderDate.startsWith(filters.order_date) : true) &&
-      (filters.status ? status.toLowerCase() === filters.status.toLowerCase() : true)
-    );
-  });
+  return (
+    customerName.toLowerCase().includes(filters.customer_name.toLowerCase()) &&
+    soNumber.toLowerCase().includes(filters.so_number.toLowerCase()) &&
+    sjNumber.toLowerCase().includes(filters.sj_number.toLowerCase()) &&
+    (filters.order_date ? orderDate.startsWith(filters.order_date) : true) &&
+    (filters.status ? status.toLowerCase() === filters.status.toLowerCase() : true)
+  );
+});
 
   // Sorting
   if (sortConfig) {
@@ -259,35 +265,58 @@ export default function SalesOrdersPage() {
   </div>
 </div>
 
-      {/* FILTERS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Filter Nama Supplier"
-          value={filters.customer_name}
-          onChange={(e) => setFilters({ ...filters, customer_name: e.target.value })}
-          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-        />
-        <input
-          type="date"
-          placeholder="Filter Tgl Order"
-          value={filters.order_date}
-          onChange={(e) => setFilters({ ...filters, order_date: e.target.value })}
-          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-        />
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          <option value="">All Status</option>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s.replace('_', ' ')}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* FILTERS */}<div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+
+  {/* Supplier */}
+  <input
+    type="text"
+    placeholder="Filter Nama Supplier"
+    value={filters.customer_name}
+    onChange={(e) => setFilters({ ...filters, customer_name: e.target.value })}
+    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+  />
+
+  {/* No SO */}
+  <input
+    type="text"
+    placeholder="Filter No SO"
+    value={filters.so_number}
+    onChange={(e) => setFilters({ ...filters, so_number: e.target.value })}
+    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+  />
+
+  {/* No SJ */}
+  <input
+    type="text"
+    placeholder="Filter No SJ"
+    value={filters.sj_number}
+    onChange={(e) => setFilters({ ...filters, sj_number: e.target.value })}
+    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+  />
+
+  {/* Tanggal */}
+  <input
+    type="date"
+    value={filters.order_date}
+    onChange={(e) => setFilters({ ...filters, order_date: e.target.value })}
+    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+  />
+
+  {/* Status */}
+  <select
+    value={filters.status}
+    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+  >
+    <option value="">All Status</option>
+    {STATUS_OPTIONS.map((s) => (
+      <option key={s} value={s}>
+        {s.replace('_', ' ')}
+      </option>
+    ))}
+  </select>
+
+</div>
 
       {/* INFO STATE */}
       {loading && <div className="mb-2 text-gray-500">Loading...</div>}

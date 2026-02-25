@@ -29,6 +29,9 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [soFilter, setSoFilter] = useState("");
+const [tagihFilter, setTagihFilter] = useState<"all" | "yes" | "no">("all");
+const [bayarFilter, setBayarFilter] = useState<"all" | "yes" | "no">("all");
 
   /* ================= FETCH ================= */
   useEffect(() => {
@@ -62,14 +65,22 @@ export default function InvoicesPage() {
   /* ================= FILTER ================= */
   const filteredRows = useMemo(() => {
   return rows.filter((r) => {
-    // 🔎 Search: customer name / SJ
     const keyword = search.toLowerCase();
+
+    // 🔎 Search: customer name / SJ
     const matchSearch =
       !keyword ||
       r.sj_number?.toLowerCase().includes(keyword) ||
       r.sales_order?.customer?.name
         ?.toLowerCase()
         .includes(keyword);
+
+    // 🔎 Filter No SO
+    const matchSO =
+      !soFilter ||
+      r.sales_order?.so_number
+        ?.toLowerCase()
+        .includes(soFilter.toLowerCase());
 
     // 📅 Date filter
     const rowDate = r.delivery_date
@@ -88,9 +99,35 @@ export default function InvoicesPage() {
       (!fromDate || (rowDate && rowDate >= fromDate)) &&
       (!toDate || (rowDate && rowDate <= toDate));
 
-    return matchSearch && matchDate;
+    // 🧾 Sudah Tagih Filter
+    const matchTagih =
+      tagihFilter === "all" ||
+      (tagihFilter === "yes" && r.sudah_tagih) ||
+      (tagihFilter === "no" && !r.sudah_tagih);
+
+    // 💰 Sudah Bayar Filter
+    const matchBayar =
+      bayarFilter === "all" ||
+      (bayarFilter === "yes" && r.sudah_bayar) ||
+      (bayarFilter === "no" && !r.sudah_bayar);
+
+    return (
+      matchSearch &&
+      matchSO &&
+      matchDate &&
+      matchTagih &&
+      matchBayar
+    );
   });
-}, [rows, search, dateFrom, dateTo]);
+}, [
+  rows,
+  search,
+  soFilter,
+  dateFrom,
+  dateTo,
+  tagihFilter,
+  bayarFilter,
+]);
 
   if (loading)
     return <div className="p-6 text-gray-500">Loading invoices...</div>;
@@ -105,7 +142,9 @@ export default function InvoicesPage() {
         <StatCard title="Total Invoice" value={filteredRows.length} />
       </div>
 {/* FILTER */}
-<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+<div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+
+  {/* Search */}
   <input
     type="text"
     placeholder="Cari Supplier / No SJ"
@@ -114,6 +153,16 @@ export default function InvoicesPage() {
     className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-300"
   />
 
+  {/* No SO Filter */}
+  <input
+    type="text"
+    placeholder="Filter No SO"
+    value={soFilter}
+    onChange={(e) => setSoFilter(e.target.value)}
+    className="border rounded-lg px-4 py-2"
+  />
+
+  {/* Date From */}
   <input
     type="date"
     value={dateFrom}
@@ -121,6 +170,7 @@ export default function InvoicesPage() {
     className="border rounded-lg px-4 py-2"
   />
 
+  {/* Date To */}
   <input
     type="date"
     value={dateTo}
@@ -128,13 +178,43 @@ export default function InvoicesPage() {
     className="border rounded-lg px-4 py-2"
   />
 
+  {/* Sudah Tagih */}
+  <select
+    value={tagihFilter}
+    onChange={(e) =>
+      setTagihFilter(e.target.value as "all" | "yes" | "no")
+    }
+    className="border rounded-lg px-4 py-2"
+  >
+    <option value="all">Semua Tagih</option>
+    <option value="yes">Sudah Tagih</option>
+    <option value="no">Belum Tagih</option>
+  </select>
+
+  {/* Sudah Bayar */}
+  <select
+    value={bayarFilter}
+    onChange={(e) =>
+      setBayarFilter(e.target.value as "all" | "yes" | "no")
+    }
+    className="border rounded-lg px-4 py-2"
+  >
+    <option value="all">Semua Bayar</option>
+    <option value="yes">Sudah Bayar</option>
+    <option value="no">Belum Bayar</option>
+  </select>
+
+  {/* Reset */}
   <button
     onClick={() => {
       setSearch("");
+      setSoFilter("");
       setDateFrom("");
       setDateTo("");
+      setTagihFilter("all");
+      setBayarFilter("all");
     }}
-    className="bg-gray-200 hover:bg-gray-300 rounded-lg px-4 py-2 text-sm font-medium"
+    className="bg-gray-200 hover:bg-gray-300 rounded-lg px-4 py-2 text-sm font-medium md:col-span-6"
   >
     Reset Filter
   </button>
