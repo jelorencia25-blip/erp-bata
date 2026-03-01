@@ -441,13 +441,29 @@ export default function InvoiceDetailPage() {
                   {it.product_name}
                   {it.product_size && <span className="text-sm text-gray-600"> ({it.product_size})</span>}
                 </td>
-                <td className="border border-black text-center">{it.isi_per_palet || "-"}</td>
-                <td className="border border-black text-center">{it.palet}</td>
-                <td className="border border-black text-center">{it.pcs}</td>
-                <td className="border border-black text-center">{it.return_pcs || 0}</td>
-                <td className="border border-black text-right px-2">
-                  {(it.harga_satuan || 0).toLocaleString("id-ID")}
-                </td>
+
+                {it.is_non_m3 ? (
+                  // NON-M3 (Kuli Bongkar / Ongkos Kirim): kolom tengah semua "-"
+                  <>
+                    <td className="border border-black text-center text-gray-400">-</td>
+                    <td className="border border-black text-center text-gray-400">-</td>
+                    <td className="border border-black text-center text-gray-400">-</td>
+                    <td className="border border-black text-center text-gray-400">-</td>
+                    <td className="border border-black text-center text-gray-400">-</td>
+                  </>
+                ) : (
+                  // NORMAL
+                  <>
+                    <td className="border border-black text-center">{it.isi_per_palet || "-"}</td>
+                    <td className="border border-black text-center">{it.palet}</td>
+                    <td className="border border-black text-center">{it.pcs}</td>
+                    <td className="border border-black text-center">{it.return_pcs || 0}</td>
+                    <td className="border border-black text-right px-2">
+                      {(it.harga_satuan || 0).toLocaleString("id-ID")}
+                    </td>
+                  </>
+                )}
+
                 <td className="border border-black text-right px-2 font-semibold">
                   {(it.jumlah || 0).toLocaleString("id-ID")}
                 </td>

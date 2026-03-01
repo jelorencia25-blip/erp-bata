@@ -27,9 +27,7 @@ export async function GET(
     // ===============================
     const { data: delivery, error: deliveryError } = await supabaseAdmin
       .from("delivery_orders")
-      .select(
-        "id, sj_number, delivery_date, sales_order_id, bank_account_id"
-      )
+      .select("id, sj_number, delivery_date, sales_order_id, bank_account_id")
       .eq("id", deliveryId)
       .single();
 
@@ -74,7 +72,6 @@ export async function GET(
         .select("id, bank_name, account_number, account_holder")
         .eq("id", delivery.bank_account_id)
         .single();
-
       bankAccountDetails = data ?? null;
     }
 
@@ -104,9 +101,7 @@ export async function GET(
         invoice_number: `INV-${delivery.sj_number}`,
         sj_number: delivery.sj_number,
         transaction_date:
-          delivery.delivery_date ||
-          salesOrder?.order_date ||
-          new Date(),
+          delivery.delivery_date || salesOrder?.order_date || new Date(),
         so_number: salesOrder?.so_number ?? "-",
         kepada: customerName,
         alamat: salesOrder?.delivery_address ?? "-",
@@ -128,17 +123,14 @@ export async function GET(
 
     const enrichedItems = await Promise.all(
       Array.from(productIds).map(async (productId) => {
-        const soItem = soItems?.find(
-          (i) => i.product_id === productId
-        );
-
+        const soItem = soItems?.find((i) => i.product_id === productId);
         const returnItem = returItemsRaw?.find(
           (r) => r.product_id === productId
         );
 
         const { data: product } = await supabaseAdmin
           .from("products")
-          .select("name, ukuran, isi_per_palet")
+          .select("name, ukuran, isi_per_palet, kubik_m3")
           .eq("id", productId)
           .single();
 
@@ -146,35 +138,45 @@ export async function GET(
         const actualPalet = soItem?.pallet_qty ?? 0;
         const returnPcs = returnItem?.return_pcs ?? 0;
 
+        // 🔥 DETEKSI NON-M3 (Kuli Bongkar / Ongkos Kirim)
+        // kubik_m3 = 0 atau total_pcs = 0 berarti non-m3
+        const isNonM3 =
+          !product?.kubik_m3 ||
+          product.kubik_m3 === 0 ||
+          (soItem?.total_m3 === 0 && soItem?.total_pcs === 0);
+
         let hargaSatuan = 0;
+        let jumlah = 0;
 
-        if (soItem?.total_price && soItem.total_pcs > 0) {
-          hargaSatuan = Math.round(
-            soItem.total_price / soItem.total_pcs
-          );
-        } else if (
-          soItem?.price_per_m3 &&
-          soItem?.total_m3 &&
-          soItem.total_pcs > 0
-        ) {
-          const totalHarga =
-            soItem.price_per_m3 * soItem.total_m3;
-          hargaSatuan = Math.round(
-            totalHarga / soItem.total_pcs
-          );
+        if (isNonM3) {
+          // 🔥 NON-M3: langsung pakai total_price, harga satuan = "-"
+          hargaSatuan = 0;
+          jumlah = soItem?.total_price ?? 0;
+        } else {
+          // NORMAL: hitung dari total_price / total_pcs
+          if (soItem?.total_price && soItem.total_pcs > 0) {
+            hargaSatuan = Math.round(soItem.total_price / soItem.total_pcs);
+          } else if (
+            soItem?.price_per_m3 &&
+            soItem?.total_m3 &&
+            soItem.total_pcs > 0
+          ) {
+            const totalHarga = soItem.price_per_m3 * soItem.total_m3;
+            hargaSatuan = Math.round(totalHarga / soItem.total_pcs);
+          }
+          jumlah = actualPcs * hargaSatuan;
         }
-
-        const jumlah = actualPcs * hargaSatuan;
 
         return {
           product_name: product?.name ?? "-",
           product_size: product?.ukuran ?? "-",
-          isi_per_palet: product?.isi_per_palet ?? 0,
-          palet: actualPalet,
-          pcs: actualPcs,
-          return_pcs: returnPcs,
-          harga_satuan: hargaSatuan,
+          isi_per_palet: isNonM3 ? null : (product?.isi_per_palet ?? 0),
+          palet: isNonM3 ? null : actualPalet,
+          pcs: isNonM3 ? null : actualPcs,
+          return_pcs: isNonM3 ? null : returnPcs,
+          harga_satuan: isNonM3 ? null : hargaSatuan,
           jumlah: jumlah,
+          is_non_m3: isNonM3,
         };
       })
     );
@@ -182,18 +184,16 @@ export async function GET(
     // ===============================
     // 8️⃣ HITUNG TOTAL
     // ===============================
-    const subtotal = enrichedItems.reduce(
-      (s, i) => s + i.jumlah,
-      0
-    );
+    const subtotal = enrichedItems.reduce((s, i) => s + i.jumlah, 0);
 
     const totalReturPcs = enrichedItems.reduce(
-      (s, i) => s + i.return_pcs,
+      (s, i) => s + (i.return_pcs ?? 0),
       0
     );
 
+    // Retur hanya berlaku untuk item normal (non-m3 tidak ada retur)
     const totalReturRupiah = enrichedItems.reduce(
-      (s, i) => s + i.return_pcs * i.harga_satuan,
+      (s, i) => s + (i.is_non_m3 ? 0 : (i.return_pcs ?? 0) * (i.harga_satuan ?? 0)),
       0
     );
 
@@ -206,9 +206,7 @@ export async function GET(
       invoice_number: `INV-${delivery.sj_number}`,
       sj_number: delivery.sj_number,
       transaction_date:
-        delivery.delivery_date ||
-        salesOrder?.order_date ||
-        new Date(),
+        delivery.delivery_date || salesOrder?.order_date || new Date(),
       so_number: salesOrder?.so_number ?? "-",
       supplier_name: customerName,
       kepada: salesOrder?.ship_to_name ?? "-",
@@ -222,7 +220,6 @@ export async function GET(
       total_retur: totalReturRupiah,
       total_tagihan: totalTagihan,
     });
-
   } catch (err: any) {
     console.error("INVOICE API ERROR:", err);
     return NextResponse.json(
@@ -252,11 +249,8 @@ export async function PATCH(
 
     const updateData: any = {};
 
-    if (transaction_date)
-      updateData.delivery_date = transaction_date;
-
-    if (bank_account_id)
-      updateData.bank_account_id = bank_account_id;
+    if (transaction_date) updateData.delivery_date = transaction_date;
+    if (bank_account_id) updateData.bank_account_id = bank_account_id;
 
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabaseAdmin
@@ -270,7 +264,6 @@ export async function PATCH(
     return GET(req, {
       params: Promise.resolve({ id: deliveryId }),
     });
-
   } catch (err: any) {
     console.error("UPDATE INVOICE ERROR:", err);
     return NextResponse.json(
