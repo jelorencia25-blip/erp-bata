@@ -25,7 +25,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
     "Suppliers",
     "Staffs Management",
     "Finance",
-    "Reports",
+    "Rekap",
     "Audits",
   ],
 
@@ -44,6 +44,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
     "Products",
     "Suppliers",
     "Staffs Management",
+    "Rekap",
   ],
 
   staff: [
@@ -60,6 +61,7 @@ export const SIDEBAR_ACCESS: Record<UserRole, string[]> = {
     "Products",
     "Suppliers",
     "Staffs Management",
+    "Rekap",
   ],
 
   operator: [

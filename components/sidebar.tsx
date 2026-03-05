@@ -50,9 +50,8 @@ const menus: MenuItem[] = [
   { label: 'Staffs Management', href: '/staffsmanagement' },
 
   { divider: true },
-
   { label: 'Finance', href: '/finance' },
-  { label: 'Reports', href: '/reports' },
+  { label: 'Rekap', href: '/rekap' }, 
   { label: 'Audits', href: '/audits' },
 ];
 
@@ -84,6 +83,11 @@ export default function Sidebar() {
     if ('divider' in menu) return true;
     return allowedMenus.includes(menu.label);
   });
+
+  // Tepat sebelum return
+console.log('role:', role);
+console.log('allowedMenus:', allowedMenus);
+console.log('filteredMenus:', filteredMenus.map(m => 'label' in m ? m.label : 'divider'));
 
   return (
     <aside className="sticky top-0 h-screen w-64 bg-[#195AAF] text-white flex flex-col">
