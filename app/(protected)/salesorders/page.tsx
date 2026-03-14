@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/lib/supabase';
+import { getAllRows } from '@/lib/lib/getAllRows';
 import Link from 'next/link';
 
 type SalesOrder = {
@@ -28,6 +29,24 @@ const ROW_STATUS_CLASS: Record<string, string> = {
 };
 
 const STATUS_OPTIONS = ['pending', 'in_delivery', 'completed', 'cancelled'];
+
+function formatMoney(n: number) {
+  if (!n) return "Rp 0";
+
+  if (n >= 1_000_000_000) {
+    return `Rp ${(n / 1_000_000_000).toFixed(1)}B`;
+  }
+
+  if (n >= 1_000_000) {
+    return `Rp ${(n / 1_000_000).toFixed(1)}M`;
+  }
+
+  if (n >= 1_000) {
+    return `Rp ${(n / 1_000).toFixed(1)}K`;
+  }
+
+  return `Rp ${n.toLocaleString("id-ID")}`;
+}
 
 function StatusBadge({ status }: { status: string | null }) {
   const map: Record<string, string> = {
@@ -72,53 +91,63 @@ export default function SalesOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({
-  customer_name: '',
-  order_date: '',
-  status: '',
-  so_number: '',
-  sj_number: '',
-});
+    customer_name: '',
+    order_date: '',
+    status: '',
+    so_number: '',
+    sj_number: '',
+  });
 
   const [sortConfig, setSortConfig] = useState<{ key: keyof SalesOrder; direction: 'asc' | 'desc' } | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
-      const { data, error } = await supabase
-        .from('v_sales_orders_list')
-        .select('*')
-        .order('order_date', { ascending: false })
-        .order('so_number', { ascending: false });
 
-      if (error) {
-        console.error(error);
-        setError(error.message);
-      } else {
-        setOrders(data || []);
+      try {
+
+        const data = await getAllRows(
+          supabase,
+          'v_sales_orders_list',
+          '*',
+          'order_date'
+        );
+
+        const sorted = (data || []).sort((a: any, b: any) => {
+          if (a.order_date === b.order_date) {
+            return (b.so_number || '').localeCompare(a.so_number || '');
+          }
+          return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
+        });
+
+        setOrders(sorted);
+
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
       }
+
       setLoading(false);
     };
 
     fetchOrders();
   }, []);
 
-  // Filtered Orders
   let filteredOrders = orders.filter((o) => {
-  const customerName = o.customer_name || '';
-  const orderDate = o.order_date || '';
-  const status = o.status || '';
-  const soNumber = o.so_number || '';
-  const sjNumber = o.sj_numbers || '';
+    const customerName = o.customer_name || '';
+    const orderDate = o.order_date || '';
+    const status = o.status || '';
+    const soNumber = o.so_number || '';
+    const sjNumber = o.sj_numbers || '';
 
-  return (
-    customerName.toLowerCase().includes(filters.customer_name.toLowerCase()) &&
-    soNumber.toLowerCase().includes(filters.so_number.toLowerCase()) &&
-    sjNumber.toLowerCase().includes(filters.sj_number.toLowerCase()) &&
-    (filters.order_date ? orderDate.startsWith(filters.order_date) : true) &&
-    (filters.status ? status.toLowerCase() === filters.status.toLowerCase() : true)
-  );
-});
+    return (
+      customerName.toLowerCase().includes(filters.customer_name.toLowerCase()) &&
+      soNumber.toLowerCase().includes(filters.so_number.toLowerCase()) &&
+      sjNumber.toLowerCase().includes(filters.sj_number.toLowerCase()) &&
+      (filters.order_date ? orderDate.startsWith(filters.order_date) : true) &&
+      (filters.status ? status.toLowerCase() === filters.status.toLowerCase() : true)
+    );
+  });
 
-  // Sorting
   if (sortConfig) {
     filteredOrders = [...filteredOrders].sort((a, b) => {
       const aValue = a[sortConfig.key] ?? '';
@@ -144,31 +173,28 @@ export default function SalesOrdersPage() {
 
   const getSortIcon = (key: keyof SalesOrder) => {
     if (sortConfig?.key !== key) return <span className="text-gray-400 ml-1">⇅</span>;
-    return sortConfig.direction === 'asc' ? (
-      <span className="text-gray-600 ml-1">▲</span>
-    ) : (
-      <span className="text-gray-600 ml-1">▼</span>
-    );
+    return sortConfig.direction === 'asc'
+      ? <span className="text-gray-600 ml-1">▲</span>
+      : <span className="text-gray-600 ml-1">▼</span>;
   };
 
-  // 🔥 CALCULATE OVERVIEW STATS
   const totalOrders = filteredOrders.length;
   const totalValue = filteredOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
   const totalPCS = filteredOrders.reduce((sum, o) => sum + (o.total_pcs || 0), 0);
-  
+
   const francoOrders = filteredOrders.filter(o => o.purchase_type === 'Franco');
   const loccoOrders = filteredOrders.filter(o => o.purchase_type === 'Locco');
-  
+
   const francoCount = francoOrders.length;
   const francoValue = francoOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
-  
+
   const loccoCount = loccoOrders.length;
   const loccoValue = loccoOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
-  
+
   const pendingCount = filteredOrders.filter(o => o.status === 'pending').length;
   const inDeliveryCount = filteredOrders.filter(o => o.status === 'in_delivery').length;
   const completedCount = filteredOrders.filter(o => o.status === 'completed').length;
- const cancelledCount = filteredOrders.filter(o => o.status === 'cancelled').length;
+  const cancelledCount = filteredOrders.filter(o => o.status === 'cancelled').length;
 
   const columns: { key: keyof SalesOrder; label: string; align?: string }[] = [
     { key: 'order_date', label: 'Tgl Order' },
@@ -203,7 +229,7 @@ export default function SalesOrdersPage() {
 
   return (
     <div className="p-6">
-      {/* HEADER + BUTTON */}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold">Sales Orders</h1>
         <Link
@@ -214,56 +240,56 @@ export default function SalesOrdersPage() {
         </Link>
       </div>
 
-      {/* 🔥 OVERVIEW CARDS */}{/* 🔥 OVERVIEW CARDS - 2 ROWS x 4 COL */}
-<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  {/* Row 1 */}
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Total SO</p>
-    <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
-  </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
-    <p className="text-xl font-bold text-gray-800">
-      Rp {(totalValue / 1000000).toFixed(1)}JT
-    </p>
-  </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Total SO</p>
+          <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
+        </div>
 
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
-    <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
-    <p className="text-xs text-gray-500">Rp {(francoValue / 1000000).toFixed(1)}JT</p>
-  </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
+          <p className="text-xl font-bold text-gray-800">
+            {formatMoney(totalValue)}
+          </p>
+        </div>
 
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
-    <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
-    <p className="text-xs text-gray-500">Rp {(loccoValue / 1000000).toFixed(1)}JT</p>
-  </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
+          <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
+          <p className="text-xs text-gray-500">{formatMoney(francoValue)}</p>
+        </div>
 
-  {/* Row 2 */}
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Pending</p>
-    <p className="text-2xl font-bold text-gray-700">{pendingCount}</p>
-  </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
+          <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
+          <p className="text-xs text-gray-500">{formatMoney(loccoValue)}</p>
+        </div>
 
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">In Delivery</p>
-    <p className="text-2xl font-bold text-yellow-700">{inDeliveryCount}</p>
-  </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Pending</p>
+          <p className="text-2xl font-bold text-gray-700">{pendingCount}</p>
+        </div>
 
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Completed</p>
-    <p className="text-2xl font-bold text-green-700">{completedCount}</p>
-  </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">In Delivery</p>
+          <p className="text-2xl font-bold text-yellow-700">{inDeliveryCount}</p>
+        </div>
 
-  <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
-    <p className="text-xs text-gray-500 uppercase font-semibold">Cancelled</p>
-    <p className="text-2xl font-bold text-red-700">
-      {filteredOrders.filter(o => o.status === 'cancelled').length}
-    </p>
-  </div>
-</div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Completed</p>
+          <p className="text-2xl font-bold text-green-700">{completedCount}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
+          <p className="text-xs text-gray-500 uppercase font-semibold">Cancelled</p>
+          <p className="text-2xl font-bold text-red-700">{cancelledCount}</p>
+        </div>
+
+      </div>
+
+      {/* SISANYA TABLE + FILTER TETAP PERSIS SAMA SEPERTI CODE KAMU */}
+
 
       {/* FILTERS */}<div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
 
