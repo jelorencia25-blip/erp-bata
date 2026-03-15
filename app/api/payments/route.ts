@@ -44,7 +44,7 @@ payments.map((p:any)=>[String(p.delivery_order_id),p.status])
 const salesOrders = await getAllRows(
 supabase,
 "sales_orders",
-"id,customer_id,ship_to_name,customer_order_ref,deposit_id",
+"id,so_number,customer_id,ship_to_name,customer_order_ref,deposit_id", // ✅ tambah so_number
 "id"
 );
 
@@ -178,19 +178,18 @@ Math.floor(
 :0;
 
 return{
-
-no:index+1,
-delivery_order_id:d.id,
-no_sj:d.sj_number,
-tgl:d.delivery_date,
-deposit_code:depositCode,
-supplier,
-ref_supplier:refSupplier,
-kepada,
-total_tagihan:totalTagihan,
-overdue,
-status
-
+  no:index+1,
+  delivery_order_id:d.id,
+  no_sj:d.sj_number,
+  tgl:d.delivery_date,
+  deposit_code:depositCode,
+  supplier,
+  ref_supplier:refSupplier,
+  kepada,
+  so_number:so?.so_number??null, // ✅ tambah so_number
+  total_tagihan:totalTagihan,
+  overdue,
+  status
 };
 
 });
