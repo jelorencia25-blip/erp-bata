@@ -23,6 +23,7 @@ export async function GET() {
         sudah_tagih,
         sudah_bayar,
         status,
+        final_status,
         sales_order:sales_orders (
           id,
           so_number,
@@ -47,7 +48,13 @@ export async function GET() {
       (invoices ?? []).map((i: any) => i.delivery_order_id)
     );
 
-    const result = (deliveries ?? []).filter((d: any) => !usedIds.has(d.id));
+    const result = (deliveries ?? [])
+      .filter((d: any) => d.final_status === "final")  // ✅ hanya yang sudah difinalize
+      .filter((d: any) => d.sj_number !== null)         // ✅ hanya yang ada sj_number
+      .filter((d: any) => !usedIds.has(d.id))           // ✅ belum ada di sales_invoices
+      .sort((a: any, b: any) =>                         // ✅ sort descending by delivery_date
+        new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime()
+      );
 
     return NextResponse.json(result);
 
