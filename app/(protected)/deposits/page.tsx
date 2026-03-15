@@ -86,7 +86,6 @@ export default function DepositsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showConfirmationStep, setShowConfirmationStep] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -96,16 +95,13 @@ export default function DepositsPage() {
   const [selectedDeposit, setSelectedDeposit] = useState<DepositDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Add SO states
   const [unlinkedSOs, setUnlinkedSOs] = useState<UnlinkedSO[]>([]);
   const [loadingUnlinked, setLoadingUnlinked] = useState(false);
   const [selectedSOId, setSelectedSOId] = useState('');
   const [linkLoading, setLinkLoading] = useState(false);
 
-  // Filters
   const [filters, setFilters] = useState({ customer: '', status: '' });
 
-  // Form states
   const [createForm, setCreateForm] = useState({
     customer_id: '',
     price_lock_per_m3: '',
@@ -269,27 +265,27 @@ export default function DepositsPage() {
   };
 
   const handleUnlinkSO = async (soId: string) => {
-  if (!selectedDeposit) return;
-  if (!confirm('Hapus SO ini dari deposit? DO remaining akan bertambah kembali.')) return;
-  try {
-    const res = await fetch(
-      `/api/deposits/${selectedDeposit.deposit.id}/so-link?sales_order_id=${soId}`,
-      {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sales_order_id: soId }),
+    if (!selectedDeposit) return;
+    if (!confirm('Hapus SO ini dari deposit? DO remaining akan bertambah kembali.')) return;
+    try {
+      const res = await fetch(
+        `/api/deposits/${selectedDeposit.deposit.id}/so-link?sales_order_id=${soId}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sales_order_id: soId }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error);
       }
-    );
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error);
+      await fetchDepositDetail(selectedDeposit.deposit.id);
+      await fetchDeposits();
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
     }
-    await fetchDepositDetail(selectedDeposit.deposit.id);
-    await fetchDeposits();
-  } catch (err: any) {
-    alert(`Error: ${err.message}`);
-  }
-};
+  };
 
   const filteredDeposits = deposits.filter((d) => {
     const matchCustomer = filters.customer
@@ -307,7 +303,6 @@ export default function DepositsPage() {
 
   return (
     <div className="p-6">
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Deposits</h1>
         <button
@@ -318,7 +313,6 @@ export default function DepositsPage() {
         </button>
       </div>
 
-      {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Total Deposits</p>
@@ -342,7 +336,6 @@ export default function DepositsPage() {
         </div>
       </div>
 
-      {/* FILTERS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <input
           type="text"
@@ -369,7 +362,6 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* TABLE */}
       <div className="overflow-x-auto bg-white shadow rounded-lg">
         <table className="min-w-full">
           <thead className="bg-gray-100 text-gray-700 uppercase text-sm">
@@ -443,7 +435,7 @@ export default function DepositsPage() {
         </table>
       </div>
 
-      {/* ===================== CREATE MODAL ===================== */}
+      {/* CREATE MODAL */}
       {showCreateModal && !showConfirmationStep && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
@@ -451,27 +443,16 @@ export default function DepositsPage() {
             <form onSubmit={(e) => { e.preventDefault(); setShowConfirmationStep(true); }}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Deposit Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={createForm.deposit_date}
+                  <label className="block text-sm font-medium mb-1">Deposit Date <span className="text-red-500">*</span></label>
+                  <input type="date" required value={createForm.deposit_date}
                     onChange={(e) => setCreateForm({ ...createForm, deposit_date: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                  />
+                    className="w-full border rounded px-3 py-2" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Supplier <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={createForm.customer_id}
+                  <label className="block text-sm font-medium mb-1">Supplier <span className="text-red-500">*</span></label>
+                  <select required value={createForm.customer_id}
                     onChange={(e) => setCreateForm({ ...createForm, customer_id: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                  >
+                    className="w-full border rounded px-3 py-2">
                     <option value="">Select Supplier</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -479,74 +460,42 @@ export default function DepositsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Harga Lock (per m³) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={createForm.price_lock_per_m3}
+                  <label className="block text-sm font-medium mb-1">Harga Lock (per m³) <span className="text-red-500">*</span></label>
+                  <input type="number" required value={createForm.price_lock_per_m3}
                     onChange={(e) => setCreateForm({ ...createForm, price_lock_per_m3: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="400000"
-                  />
+                    className="w-full border rounded px-3 py-2" placeholder="400000" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Total DO to Tag <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={createForm.total_do_tagged}
+                  <label className="block text-sm font-medium mb-1">Total DO to Tag <span className="text-red-500">*</span></label>
+                  <input type="number" required value={createForm.total_do_tagged}
                     onChange={(e) => setCreateForm({ ...createForm, total_do_tagged: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="10"
-                  />
+                    className="w-full border rounded px-3 py-2" placeholder="10" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Initial Deposit Amount (Optional)</label>
-                  <input
-                    type="number"
-                    value={createForm.deposit_amount}
+                  <input type="number" value={createForm.deposit_amount}
                     onChange={(e) => setCreateForm({ ...createForm, deposit_amount: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="50000000"
-                  />
+                    className="w-full border rounded px-3 py-2" placeholder="50000000" />
                   <p className="text-xs text-gray-500 mt-1">Bisa diisi nanti via Top Up</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Notes</label>
-                  <textarea
-                    value={createForm.notes}
+                  <textarea value={createForm.notes}
                     onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    rows={3}
-                    placeholder="Optional notes..."
-                  />
+                    className="w-full border rounded px-3 py-2" rows={3} placeholder="Optional notes..." />
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 border rounded hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Review →
-                </button>
+                <button type="button" onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Review →</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ===================== CONFIRMATION MODAL ===================== */}
+      {/* CONFIRMATION MODAL */}
       {showConfirmationStep && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -560,17 +509,10 @@ export default function DepositsPage() {
               {createForm.notes && <p><strong>Notes:</strong> {createForm.notes}</p>}
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button
-                onClick={() => setShowConfirmationStep(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
+              <button onClick={() => setShowConfirmationStep(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100">← Back</button>
+              <button onClick={handleCreate} disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
                 {loading ? 'Creating...' : 'Confirm & Create'}
               </button>
             </div>
@@ -578,20 +520,15 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* ===================== DETAIL MODAL ===================== */}
+      {/* DETAIL MODAL */}
       {showDetailModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
-              <h2 className="text-2xl font-bold">
-                Deposit Detail: {selectedDeposit.deposit.deposit_code}
-              </h2>
-              <button onClick={() => setShowDetailModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">
-                ✕
-              </button>
+              <h2 className="text-2xl font-bold">Deposit Detail: {selectedDeposit.deposit.deposit_code}</h2>
+              <button onClick={() => setShowDetailModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
             </div>
 
-            {/* DEPOSIT INFO */}
             <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded">
               <div>
                 <p className="text-sm text-gray-600">Supplier</p>
@@ -622,7 +559,6 @@ export default function DepositsPage() {
               </div>
             </div>
 
-            {/* PAYMENT HISTORY */}
             <div className="mb-6">
               <h3 className="text-lg font-bold mb-2">Payment History</h3>
               {selectedDeposit.payments.length === 0 ? (
@@ -684,9 +620,7 @@ export default function DepositsPage() {
                       <th className="p-2 text-right">DO Count</th>
                       <th className="p-2 text-right">Amount Used</th>
                       <th className="p-2 text-center">Status</th>
-                      {selectedDeposit.deposit.status === 'active' && (
-                        <th className="p-2 text-center">Aksi</th>
-                      )}
+                      <th className="p-2 text-center">Aksi</th> {/* ✅ selalu tampil */}
                     </tr>
                   </thead>
                   <tbody>
@@ -706,16 +640,14 @@ export default function DepositsPage() {
                         <td className="p-2 text-center">
                           <StatusBadge status={u.sales_order.status} />
                         </td>
-                        {selectedDeposit.deposit.status === 'active' && (
-                          <td className="p-2 text-center">
-                            <button
-                              onClick={() => handleUnlinkSO(u.sales_order.id)}
-                              className="text-red-500 hover:text-red-700 text-xs font-medium"
-                            >
-                              Hapus
-                            </button>
-                          </td>
-                        )}
+                        <td className="p-2 text-center"> {/* ✅ selalu tampil */}
+                          <button
+                            onClick={() => handleUnlinkSO(u.sales_order.id)}
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            Hapus
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -725,25 +657,19 @@ export default function DepositsPage() {
 
             <div className="flex justify-end gap-2 mt-6">
               {selectedDeposit.deposit.status === 'active' && (
-                <button
-                  onClick={() => setShowTopUpModal(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
+                <button onClick={() => setShowTopUpModal(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
                   Top Up Deposit
                 </button>
               )}
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
-              >
-                Close
-              </button>
+              <button onClick={() => setShowDetailModal(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100">Close</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ===================== ADD SO MODAL ===================== */}
+      {/* ADD SO MODAL */}
       {showAddSOModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
@@ -751,19 +677,13 @@ export default function DepositsPage() {
             <p className="text-sm text-gray-500 mb-4">
               Pilih SO milik <strong>{selectedDeposit.deposit.customer_name}</strong> yang belum terhubung ke deposit manapun.
             </p>
-
             {loadingUnlinked ? (
               <p className="text-gray-400 text-sm py-4 text-center">Loading...</p>
             ) : unlinkedSOs.length === 0 ? (
-              <p className="text-gray-400 text-sm py-4 text-center">
-                Tidak ada SO yang tersedia untuk ditambahkan.
-              </p>
+              <p className="text-gray-400 text-sm py-4 text-center">Tidak ada SO yang tersedia untuk ditambahkan.</p>
             ) : (
-              <select
-                value={selectedSOId}
-                onChange={(e) => setSelectedSOId(e.target.value)}
-                className="w-full border rounded px-3 py-2 mb-4"
-              >
+              <select value={selectedSOId} onChange={(e) => setSelectedSOId(e.target.value)}
+                className="w-full border rounded px-3 py-2 mb-4">
                 <option value="">-- Pilih SO --</option>
                 {unlinkedSOs.map((so) => (
                   <option key={so.id} value={so.id}>
@@ -772,19 +692,11 @@ export default function DepositsPage() {
                 ))}
               </select>
             )}
-
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => { setShowAddSOModal(false); setSelectedSOId(''); }}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleLinkSO}
-                disabled={!selectedSOId || linkLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
+              <button onClick={() => { setShowAddSOModal(false); setSelectedSOId(''); }}
+                className="px-4 py-2 border rounded hover:bg-gray-100">Batal</button>
+              <button onClick={handleLinkSO} disabled={!selectedSOId || linkLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
                 {linkLoading ? 'Menyimpan...' : 'Tambah SO'}
               </button>
             </div>
@@ -792,35 +704,24 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* ===================== TOP UP MODAL ===================== */}
+      {/* TOP UP MODAL */}
       {showTopUpModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              Top Up Deposit: {selectedDeposit.deposit.deposit_code}
-            </h2>
+            <h2 className="text-2xl font-bold mb-4">Top Up Deposit: {selectedDeposit.deposit.deposit_code}</h2>
             <form onSubmit={handleTopUp}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Amount <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={topUpForm.amount}
+                  <label className="block text-sm font-medium mb-1">Amount <span className="text-red-500">*</span></label>
+                  <input type="number" required value={topUpForm.amount}
                     onChange={(e) => setTopUpForm({ ...topUpForm, amount: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="30000000"
-                  />
+                    className="w-full border rounded px-3 py-2" placeholder="30000000" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Payment Method</label>
-                  <select
-                    value={topUpForm.payment_method}
+                  <select value={topUpForm.payment_method}
                     onChange={(e) => setTopUpForm({ ...topUpForm, payment_method: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                  >
+                    className="w-full border rounded px-3 py-2">
                     <option value="Transfer">Transfer</option>
                     <option value="Cash">Cash</option>
                     <option value="Check">Check</option>
@@ -828,38 +729,22 @@ export default function DepositsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Reference Number</label>
-                  <input
-                    type="text"
-                    value={topUpForm.reference_number}
+                  <input type="text" value={topUpForm.reference_number}
                     onChange={(e) => setTopUpForm({ ...topUpForm, reference_number: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="REF-12345"
-                  />
+                    className="w-full border rounded px-3 py-2" placeholder="REF-12345" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Notes</label>
-                  <textarea
-                    value={topUpForm.notes}
+                  <textarea value={topUpForm.notes}
                     onChange={(e) => setTopUpForm({ ...topUpForm, notes: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    rows={2}
-                    placeholder="Optional notes..."
-                  />
+                    className="w-full border rounded px-3 py-2" rows={2} placeholder="Optional notes..." />
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowTopUpModal(false)}
-                  className="px-4 py-2 border rounded hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                >
+                <button type="button" onClick={() => setShowTopUpModal(false)}
+                  className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
+                <button type="submit" disabled={loading}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
                   {loading ? 'Processing...' : 'Add Payment'}
                 </button>
               </div>
