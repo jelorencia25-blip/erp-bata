@@ -44,7 +44,7 @@ payments.map((p:any)=>[String(p.delivery_order_id),p.status])
 const salesOrders = await getAllRows(
 supabase,
 "sales_orders",
-"id,so_number,customer_id,ship_to_name,customer_order_ref,deposit_id", // ✅ tambah so_number
+"id,so_number,customer_id,ship_to_name,customer_order_ref,deposit_id",
 "id"
 );
 
@@ -83,22 +83,16 @@ deposits.map((d:any)=>[String(d.id),d.deposit_code])
 const soItems = await getAllRows(
 supabase,
 "sales_order_items",
-"sales_order_id,total_price,total_pcs",
+"sales_order_id,product_id,total_price,total_pcs", // ✅ tambah product_id
 "sales_order_id"
 );
 
-const soItemMap = new Map();
+const soItemMap = new Map<string, any[]>();
 
 for (const item of soItems){
-
-const key=String(item.sales_order_id);
-
-if(!soItemMap.has(key)){
-soItemMap.set(key,[]);
-}
-
-soItemMap.get(key).push(item);
-
+  const key=String(item.sales_order_id);
+  if(!soItemMap.has(key)) soItemMap.set(key,[]);
+  soItemMap.get(key)!.push(item);
 }
 
 /* ================= RETURNS ================= */
@@ -106,21 +100,17 @@ soItemMap.get(key).push(item);
 const returns = await getAllRows(
 supabase,
 "delivery_return_items",
-"delivery_order_id,return_pcs",
+"delivery_order_id,product_id,return_pcs", // ✅ tambah product_id
 "delivery_order_id"
 );
 
-const returnMap = new Map();
+// ✅ Map: do_id -> list of return items (bukan agregat)
+const returnItemMap = new Map<string, any[]>();
 
 for(const r of returns){
-
-const key=String(r.delivery_order_id);
-
-returnMap.set(
-key,
-(returnMap.get(key)??0)+(r.return_pcs??0)
-);
-
+  const key=String(r.delivery_order_id);
+  if(!returnItemMap.has(key)) returnItemMap.set(key,[]);
+  returnItemMap.get(key)!.push(r);
 }
 
 /* ================= BUILD ================= */
@@ -152,16 +142,20 @@ const subtotal=items.reduce(
 (s:number,i:any)=>s+(i.total_price??0),0
 );
 
-const totalPcs=items.reduce(
-(s:number,i:any)=>s+(i.total_pcs??0),0
-);
+// ✅ Hitung retur per produk — sama persis kayak invoice
+const returItemList = returnItemMap.get(String(d.id)) ?? [];
+let returRupiah = 0;
+let returPcs = 0;
+for (const ret of returItemList) {
+  returPcs += ret.return_pcs ?? 0;
+  const soItem = items.find((i:any) => i.product_id === ret.product_id);
+  if (soItem && soItem.total_pcs > 0) {
+    const hargaSatuan = Math.round(soItem.total_price / soItem.total_pcs);
+    returRupiah += (ret.return_pcs ?? 0) * hargaSatuan;
+  }
+}
 
-const returPcs=returnMap.get(String(d.id))??0;
-
-const hargaSatuan=
-totalPcs>0?Math.round(subtotal/totalPcs):0;
-
-const totalTagihan=subtotal-returPcs*hargaSatuan;
+const totalTagihan=subtotal-returRupiah; // ✅ dikurangi retur per produk
 
 const status=paymentMap.get(String(d.id))??"unpaid";
 
@@ -186,7 +180,7 @@ return{
   supplier,
   ref_supplier:refSupplier,
   kepada,
-  so_number:so?.so_number??null, // ✅ tambah so_number
+  so_number:so?.so_number??null,
   total_tagihan:totalTagihan,
   overdue,
   status
