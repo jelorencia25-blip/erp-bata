@@ -78,6 +78,7 @@ export async function GET(
       created_at: u.created_at,
       sj_number: u.delivery_orders?.sj_number || '-',
       delivery_date: u.delivery_orders?.delivery_date || '-',
+      delivery_order_id: u.delivery_orders?.id || null, // ✅ tambah ini
       sales_order: u.sales_orders,
     }));
 
