@@ -22,6 +22,7 @@ const PAGE_SIZE = 50;
 export default function PaymentsPage() {
   const allData = useRef<PaymentRow[]>([]);
   const [data, setData] = useState<PaymentRow[]>([]);
+  const [filteredAll, setFilteredAll] = useState<PaymentRow[]>([]); // ✅ semua hasil filter sebelum paginate
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRows, setTotalRows] = useState(0);
@@ -54,7 +55,6 @@ export default function PaymentsPage() {
     setCurrentPage(1);
   };
 
-  // Apply filter + paginate whenever data or filters change
   useEffect(() => {
     if (allData.current.length === 0 && !loading) return;
     applyFilter(1);
@@ -70,9 +70,10 @@ export default function PaymentsPage() {
     if (search) {
       const kw = search.toLowerCase();
       filtered = filtered.filter(d =>
-        d.no_sj.toLowerCase().includes(kw) ||
-        d.supplier.toLowerCase().includes(kw) ||
-        d.deposit_code?.toLowerCase().includes(kw)
+        d.no_sj?.toLowerCase().includes(kw) ||
+        d.supplier?.toLowerCase().includes(kw) ||
+        d.deposit_code?.toLowerCase().includes(kw) ||
+        d.so_number?.toLowerCase().includes(kw) // ✅ tambah so_number
       );
     }
 
@@ -94,24 +95,21 @@ export default function PaymentsPage() {
       filtered = [...filtered].sort((a, b) => {
         const va = a[sortKey];
         const vb = b[sortKey];
-
         if (va == null) return 1;
         if (vb == null) return -1;
-
         if (typeof va === "number" && typeof vb === "number") {
           return sortDir === "asc" ? va - vb : vb - va;
         }
-
         return sortDir === "asc"
           ? String(va).localeCompare(String(vb))
           : String(vb).localeCompare(String(va));
       });
     }
 
+    setFilteredAll(filtered); // ✅ simpan hasil filter lengkap untuk KPI
     setTotalRows(filtered.length);
 
     const start = (page - 1) * PAGE_SIZE;
-
     setData(
       filtered
         .slice(start, start + PAGE_SIZE)
@@ -119,20 +117,17 @@ export default function PaymentsPage() {
     );
   };
 
-  // KPI dari semua data (tidak dipengaruhi filter)
+  // ✅ KPI sekarang dari filteredAll, bukan allData
   const overview = useMemo(() => {
-    const all = allData.current;
-
+    const all = filteredAll;
     const paid = all.filter(d => d.status === "paid").length;
     const unpaid = all.filter(d => d.status === "unpaid").length;
     const overdue = all.filter(d => d.status === "unpaid" && d.overdue > 5).length;
-
     const unpaidAmount = all
       .filter(d => d.status === "unpaid")
       .reduce((s, d) => s + (d.total_tagihan ?? 0), 0);
-
     return { total: all.length, paid, unpaid, overdue, unpaidAmount };
-  }, [allData.current]);
+  }, [filteredAll]); // ✅ reactive terhadap filter
 
   const updateStatus = async (delivery_order_id: string, status: "paid" | "unpaid") => {
     allData.current = allData.current.map(r =>
@@ -172,7 +167,7 @@ export default function PaymentsPage() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-2">
-        <input type="text" placeholder="Cari No SJ / Nama Supplier / Kode Deposit"
+        <input type="text" placeholder="Cari No SJ / No SO / Nama Supplier / Kode Deposit"
           value={search}
           onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
           className="border rounded-lg px-4 py-2 w-full md:w-1/3 focus:ring-2 focus:ring-blue-300" />
