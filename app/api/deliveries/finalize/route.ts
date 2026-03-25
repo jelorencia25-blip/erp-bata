@@ -17,22 +17,25 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+
+const { data: checkData } = await supabase
+  .from("delivery_orders")
+  .select("id, final_status")
+  .eq("id", delivery_order_id)
+  .single();
+
+console.log("🔍 Before update:", checkData);
+
+
     // ✅ UPDATE FINAL_STATUS (ONLY IF STILL DRAFT)
     const { data, error } = await supabase
-      .from("delivery_orders")
-      .update({
-        final_status: "final",
-      })
-      .eq("id", delivery_order_id)
-      .eq("final_status", "draft")
-      .select("id");
+  .from("delivery_orders")
+  .update({ final_status: "final" })
+  .eq("id", delivery_order_id)
+  .eq("final_status", "draft")
+  .select("id");
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+console.log("🔍 Result:", { data, error }); // ← tambah ini sementara
 
     // ❗ penting: ga ada row ke-update
     if (!data || data.length === 0) {

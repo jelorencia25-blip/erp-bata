@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 type FakturRow = {
   no: number;
-  sj_number: string;
+  so_number: string;
   ukuran: string;
   retur_pcs: number;
   nama_toko: string;
@@ -41,39 +41,45 @@ export default function FakturTerimaPage() {
 
         setTanggalDeposit(deposit.deposit_date || '');
 
-        // Fetch invoice detail per usage (per DO) untuk dapat nilai invoice final
+        // Group usages by SO id
+        const soMap = new Map<string, typeof usages>();
+        for (const u of usages) {
+          const soId = u.sales_order?.id;
+          if (!soId) continue;
+          if (!soMap.has(soId)) soMap.set(soId, []);
+          soMap.get(soId)!.push(u);
+        }
+
         const rows: FakturRow[] = [];
         let no = 1;
 
-        for (const u of usages) {
-          // Kalau tidak ada SJ number, skip
-          if (!u.sj_number || u.sj_number === '-') continue;
-
-          // Fetch invoice detail per delivery order
-          if (!u.delivery_order_id) continue; // skip kalau tidak ada DO
-          const invoiceRes = await fetch(`/api/invoices/${u.delivery_order_id}`);
-
-
-          const invoiceData = await invoiceRes.json();
-
-          // Ambil ukuran dari items (gabung unique)
+        for (const [_, soUsages] of soMap) {
+          const firstUsage = soUsages[0];
           const ukuranSet = new Set<string>();
           let totalReturPcs = 0;
+          let totalNilaiInvoice = 0;
 
-          for (const item of invoiceData.items || []) {
-            if (item.pcs != null && item.product_size) {
-              ukuranSet.add(item.product_size);
+          // Fetch invoice per DO yang ada di SO ini
+          for (const u of soUsages) {
+            if (!u.delivery_order_id) continue;
+
+            const invoiceRes = await fetch(`/api/invoices/${u.delivery_order_id}`);
+            const invoiceData = await invoiceRes.json();
+
+            for (const item of invoiceData.items || []) {
+              if (item.product_size) ukuranSet.add(item.product_size);
+              totalReturPcs += item.return_pcs ?? 0;
             }
-            totalReturPcs += item.return_pcs ?? 0;
+            totalNilaiInvoice += invoiceData.total_tagihan ?? 0;
           }
 
           rows.push({
             no: no++,
-            sj_number: u.sj_number,
+            so_number: firstUsage.sales_order?.so_number || '-',
             ukuran: Array.from(ukuranSet).join(', ') || '-',
             retur_pcs: totalReturPcs,
-            nama_toko: u.sales_order?.ship_to_name || '-',
-            nilai_invoice: invoiceData.total_tagihan ?? 0,
+            nama_toko: firstUsage.sales_order?.ship_to_name || '-',
+            nilai_invoice: totalNilaiInvoice,
           });
         }
 
@@ -171,7 +177,7 @@ export default function FakturTerimaPage() {
               {/* TABLE HEADER */}
               <tr className="bg-gray-100">
                 <td className="border border-black p-2 text-center font-semibold w-10">No</td>
-                <td className="border border-black p-2 font-semibold">No Surat Jalan</td>
+                <td className="border border-black p-2 font-semibold">No Sales Order</td>
                 <td className="border border-black p-2 font-semibold text-center">Ukuran</td>
                 <td className="border border-black p-2 font-semibold text-center">Retur (pcs)</td>
                 <td className="border border-black p-2 font-semibold">Nama Toko / Tujuan</td>
@@ -182,7 +188,7 @@ export default function FakturTerimaPage() {
               {data.rows.map((r) => (
                 <tr key={r.no}>
                   <td className="border border-black p-2 text-center">{r.no}</td>
-                  <td className="border border-black p-2">{r.sj_number}</td>
+                  <td className="border border-black p-2">{r.so_number}</td>
                   <td className="border border-black p-2 text-center">{r.ukuran}</td>
                   <td className="border border-black p-2 text-center">{r.retur_pcs > 0 ? r.retur_pcs : '-'}</td>
                   <td className="border border-black p-2">{r.nama_toko}</td>
