@@ -23,7 +23,8 @@ export async function GET(req: Request) {
       id,
       deposit_code,
       price_lock_per_m3,
-      do_remaining
+      do_remaining,
+      notes
     `)
     .eq("customer_id", customerId)
     .eq("status", "active")

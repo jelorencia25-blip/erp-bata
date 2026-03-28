@@ -117,6 +117,17 @@ export default function DepositsPage() {
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showAddSOModal, setShowAddSOModal] = useState(false);
 
+  // ✅ NEW: Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    deposit_date: '',
+    price_lock_per_m3: '',
+    total_do_tagged: '',
+    notes: '',
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+
   const [selectedDeposit, setSelectedDeposit] = useState<DepositDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -262,6 +273,47 @@ export default function DepositsPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ NEW: handleEdit
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDeposit) return;
+
+    const newTotal = parseInt(editForm.total_do_tagged);
+    const doUsed = selectedDeposit.deposit.do_used;
+
+    if (newTotal < doUsed) {
+      setEditError(`Total DO tidak boleh kurang dari DO yang sudah digunakan (${doUsed})`);
+      return;
+    }
+
+    setEditLoading(true);
+    setEditError('');
+    try {
+      const do_remaining = newTotal - doUsed;
+      const res = await fetch(`/api/deposits/${selectedDeposit.deposit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deposit_date: editForm.deposit_date,
+          price_lock_per_m3: parseFloat(editForm.price_lock_per_m3),
+          total_do_tagged: newTotal,
+          notes: editForm.notes || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update deposit');
+      }
+      await fetchDepositDetail(selectedDeposit.deposit.id);
+      await fetchDeposits();
+      setShowEditModal(false);
+    } catch (err: any) {
+      setEditError(err.message);
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -421,7 +473,7 @@ export default function DepositsPage() {
                   <td className="p-3 text-center">{d.so_count}</td>
                   <td className="p-3 text-center"><StatusBadge status={d.status} /></td>
 
-                  {/* ✅ ACTION — icon buttons horizontal */}
+                  {/* ACTION — icon buttons horizontal */}
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-1">
 
@@ -567,9 +619,11 @@ export default function DepositsPage() {
               <button onClick={() => setShowDetailModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
             </div>
 
+            {/* ✅ UPDATED: Info grid with Notes added */}
             <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded">
               <div><p className="text-sm text-gray-600">Supplier</p><p className="font-semibold">{selectedDeposit.deposit.customer_name}</p></div>
               <div><p className="text-sm text-gray-600">Status</p><StatusBadge status={selectedDeposit.deposit.status} /></div>
+              <div><p className="text-sm text-gray-600">Deposit Date</p><p className="font-semibold">{selectedDeposit.deposit.deposit_date}</p></div>
               <div><p className="text-sm text-gray-600">Harga Lock</p><p className="font-semibold">Rp {selectedDeposit.deposit.price_lock_per_m3.toLocaleString('id-ID')}/m³</p></div>
               <div>
                 <p className="text-sm text-gray-600">DO Tagged</p>
@@ -579,7 +633,18 @@ export default function DepositsPage() {
                 </p>
               </div>
               <div><p className="text-sm text-gray-600">Deposit Amount</p><p className="font-semibold">Rp {selectedDeposit.deposit.deposit_amount.toLocaleString('id-ID')}</p></div>
+              <div><p className="text-sm text-gray-600">Amount Used</p><p className="font-semibold text-orange-600">Rp {selectedDeposit.deposit.amount_used.toLocaleString('id-ID')}</p></div>
               <div><p className="text-sm text-gray-600">Amount Remaining</p><p className="font-semibold text-green-600">Rp {selectedDeposit.deposit.amount_remaining.toLocaleString('id-ID')}</p></div>
+              {/* ✅ NEW: Notes — full width, always shown */}
+              <div className="col-span-2">
+                <p className="text-sm text-gray-600">Notes</p>
+                <p className="font-medium text-gray-800">
+                  {selectedDeposit.deposit.notes
+                    ? selectedDeposit.deposit.notes
+                    : <span className="text-gray-400 italic">—</span>
+                  }
+                </p>
+              </div>
             </div>
 
             <div className="mb-6">
@@ -669,7 +734,23 @@ export default function DepositsPage() {
               )}
             </div>
 
+            {/* ✅ UPDATED: Footer with Edit button added */}
             <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => {
+                  setEditForm({
+                    deposit_date: selectedDeposit.deposit.deposit_date,
+                    price_lock_per_m3: String(selectedDeposit.deposit.price_lock_per_m3),
+                    total_do_tagged: String(selectedDeposit.deposit.total_do_tagged),
+                    notes: selectedDeposit.deposit.notes || '',
+                  });
+                  setEditError('');
+                  setShowEditModal(true);
+                }}
+                className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+              >
+                ✏️ Edit Deposit
+              </button>
               {selectedDeposit.deposit.status === 'active' && (
                 <button onClick={() => setShowTopUpModal(true)}
                   className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
@@ -760,6 +841,69 @@ export default function DepositsPage() {
                 <button type="submit" disabled={loading}
                   className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
                   {loading ? 'Processing...' : 'Add Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NEW: EDIT MODAL */}
+      {showEditModal && selectedDeposit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h2 className="text-2xl font-bold mb-1">Edit Deposit</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Supplier: <strong>{selectedDeposit.deposit.customer_name}</strong> — {selectedDeposit.deposit.deposit_code}
+            </p>
+
+            {editError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleEdit}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Deposit Date <span className="text-red-500">*</span></label>
+                  <input type="date" required value={editForm.deposit_date}
+                    onChange={(e) => setEditForm({ ...editForm, deposit_date: e.target.value })}
+                    className="w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Harga Lock (per m³) <span className="text-red-500">*</span></label>
+                  <input type="number" required value={editForm.price_lock_per_m3}
+                    onChange={(e) => setEditForm({ ...editForm, price_lock_per_m3: e.target.value })}
+                    className="w-full border rounded px-3 py-2" placeholder="400000" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Total DO Tagged <span className="text-red-500">*</span></label>
+                  <input type="number" required
+                    min={selectedDeposit.deposit.do_used}
+                    value={editForm.total_do_tagged}
+                    onChange={(e) => setEditForm({ ...editForm, total_do_tagged: e.target.value })}
+                    className="w-full border rounded px-3 py-2" />
+                  {selectedDeposit.deposit.do_used > 0 && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      ⚠️ Minimum {selectedDeposit.deposit.do_used} (sudah ada DO terpakai)
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Notes</label>
+                  <textarea value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    className="w-full border rounded px-3 py-2" rows={3} placeholder="Optional notes..." />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button type="button"
+                  onClick={() => { setShowEditModal(false); setEditError(''); }}
+                  className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
+                <button type="submit" disabled={editLoading}
+                  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50">
+                  {editLoading ? 'Saving...' : 'Simpan Perubahan'}
                 </button>
               </div>
             </form>

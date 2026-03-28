@@ -36,6 +36,7 @@ type Deposit = {
   deposit_code: string;
   price_lock_per_m3: number;
   do_remaining: number;
+  notes: string | null;
 };
 
 type SalesOrderItem = {
@@ -449,6 +450,7 @@ export default function AddSalesOrderPage() {
                     {d.deposit_code}
                     {" | Sisa "}{d.do_remaining} DO
                     {" | "}{rupiah(d.price_lock_per_m3)}/m³
+                     {d.notes ? ` | ${d.notes}` : ""}
                   </option>
                 ))}
               </select>
