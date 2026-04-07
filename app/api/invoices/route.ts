@@ -48,11 +48,19 @@ export async function GET() {
       (invoices ?? []).map((i: any) => i.delivery_order_id)
     );
 
-    const result = (deliveries ?? [])
-      .filter((d: any) => d.final_status === "final")  // ✅ hanya yang sudah difinalize
-      .filter((d: any) => d.sj_number !== null)         // ✅ hanya yang ada sj_number
-      .filter((d: any) => !usedIds.has(d.id))           // ✅ belum ada di sales_invoices
-      .sort((a: any, b: any) =>                         // ✅ sort descending by delivery_date
+    // Deduplicate deliveries by id (caused by one-to-many deposit join)
+    const seen = new Set();
+    const uniqueDeliveries = (deliveries ?? []).filter((d: any) => {
+      if (seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
+
+    const result = uniqueDeliveries
+      .filter((d: any) => d.final_status === "final")
+      .filter((d: any) => d.sj_number !== null)
+      .filter((d: any) => !usedIds.has(d.id))
+      .sort((a: any, b: any) =>
         new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime()
       );
 

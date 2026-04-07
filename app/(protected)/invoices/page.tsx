@@ -17,7 +17,7 @@ type InvoiceRow = {
     } | null;
     deposit?: {
       deposit_code: string;
-    } | null;
+    }[] | null;
   } | null;
 };
 
@@ -64,11 +64,16 @@ export default function InvoicesPage() {
     return rows.filter((r) => {
       const keyword = search.toLowerCase();
 
+      // deposit is now an array, grab first element's deposit_code
+      const depositCode = Array.isArray(r.sales_order?.deposit)
+        ? r.sales_order?.deposit?.[0]?.deposit_code
+        : (r.sales_order?.deposit as any)?.deposit_code;
+
       const matchSearch =
         !keyword ||
         r.sj_number?.toLowerCase().includes(keyword) ||
         r.sales_order?.customer?.name?.toLowerCase().includes(keyword) ||
-        r.sales_order?.deposit?.deposit_code?.toLowerCase().includes(keyword);
+        depositCode?.toLowerCase().includes(keyword);
 
       const matchSO =
         !soFilter ||
@@ -207,46 +212,53 @@ export default function InvoicesPage() {
                 </td>
               </tr>
             ) : (
-              filteredRows.map((r, i) => (
-                <tr key={r.id} className="border-b hover:bg-gray-50 transition">
-                  <td className="p-3">{i + 1}</td>
-                  <td className="p-3 font-medium">{r.sales_order?.so_number ?? "-"}</td>
-                  <td className="p-3 font-medium">{r.sj_number}</td>
-                  <td className="p-3 text-sm text-gray-600">
-                    {r.sales_order?.deposit?.deposit_code ?? "-"}
-                  </td>
-                  <td className="p-3">
-                    {r.sales_order?.customer?.name ?? "-"}
-                  </td>
-                  <td className="p-3">
-                    {r.delivery_date
-                      ? new Date(r.delivery_date).toLocaleDateString("id-ID")
-                      : "-"}
-                  </td>
-                  <td className="p-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={!!r.sudah_tagih}
-                      onChange={(e) => updateCheckbox(r.id, "sudah_tagih", e.target.checked)}
-                    />
-                  </td>
-                  <td className="p-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={!!r.sudah_bayar}
-                      onChange={(e) => updateCheckbox(r.id, "sudah_bayar", e.target.checked)}
-                    />
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => router.push(`/invoices/${r.id}`)}
-                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"
-                    >
-                      Lihat Invoice
-                    </button>
-                  </td>
-                </tr>
-              ))
+              filteredRows.map((r, i) => {
+                // deposit is an array, grab first element
+                const depositCode = Array.isArray(r.sales_order?.deposit)
+                  ? r.sales_order?.deposit?.[0]?.deposit_code
+                  : (r.sales_order?.deposit as any)?.deposit_code;
+
+                return (
+                  <tr key={`${r.id}-${i}`} className="border-b hover:bg-gray-50 transition">
+                    <td className="p-3">{i + 1}</td>
+                    <td className="p-3 font-medium">{r.sales_order?.so_number ?? "-"}</td>
+                    <td className="p-3 font-medium">{r.sj_number}</td>
+                    <td className="p-3 text-sm text-gray-600">
+                      {depositCode ?? "-"}
+                    </td>
+                    <td className="p-3">
+                      {r.sales_order?.customer?.name ?? "-"}
+                    </td>
+                    <td className="p-3">
+                      {r.delivery_date
+                        ? new Date(r.delivery_date).toLocaleDateString("id-ID")
+                        : "-"}
+                    </td>
+                    <td className="p-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!r.sudah_tagih}
+                        onChange={(e) => updateCheckbox(r.id, "sudah_tagih", e.target.checked)}
+                      />
+                    </td>
+                    <td className="p-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!r.sudah_bayar}
+                        onChange={(e) => updateCheckbox(r.id, "sudah_bayar", e.target.checked)}
+                      />
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => router.push(`/invoices/${r.id}`)}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"
+                      >
+                        Lihat Invoice
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
