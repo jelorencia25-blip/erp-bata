@@ -74,23 +74,22 @@ export default function DeliveryProcessedDetailPage() {
       setLoading(true);
       try {
         const apiUrl = `/api/deliveries/processed/${id}`;
-    console.log("🌐 FETCHING URL:", apiUrl);
-    
-    const res = await fetch(apiUrl);
-    console.log("🌐 Response URL:", res.url);
-    console.log("🌐 Response status:", res.status);
+        console.log("🌐 FETCHING URL:", apiUrl);
+        
+        const res = await fetch(apiUrl);
+        console.log("🌐 Response URL:", res.url);
+        console.log("🌐 Response status:", res.status);
         if (!res.ok) throw new Error((await res.json()).error || "Gagal load data");
         const json: Delivery = await res.json();
 
         console.log("DELIVERY RESPONSE:", json);
         console.log("NO GUDANG:", json.no_gudang);
       
-// 🔥 TARUH DEBUG LOGS DI SINI (SEBELUM setData)
-console.log("🔍 RAW API RESPONSE:", JSON.stringify(json, null, 2));
-console.log("🔍 no_gudang:", json.no_gudang);
-console.log("🔍 no_gudang type:", typeof json.no_gudang);
-console.log("🔍 no_gudang === null?", json.no_gudang === null);
-console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
+        console.log("🔍 RAW API RESPONSE:", JSON.stringify(json, null, 2));
+        console.log("🔍 no_gudang:", json.no_gudang);
+        console.log("🔍 no_gudang type:", typeof json.no_gudang);
+        console.log("🔍 no_gudang === null?", json.no_gudang === null);
+        console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
 
         setData(json);
         setNoGudang(json.no_gudang ?? "");
@@ -124,8 +123,6 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
     loadData();
   }, [id]);
 
-  
-
   const stripUnsupportedColors = (el: HTMLElement) => {
     const all = el.querySelectorAll("*");
 
@@ -156,10 +153,8 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
       return;
     }
 
-    // Clone element untuk tidak mengganggu tampilan asli
     const clone = element.cloneNode(true) as HTMLElement;
     
-    // Hide print-only elements dan show hidden print inputs
     clone.querySelectorAll('.print\\:hidden').forEach(el => {
       (el as HTMLElement).style.display = 'none';
     });
@@ -170,15 +165,14 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
       (el as HTMLElement).style.display = 'block';
     });
 
-    // Append ke body sementara (agar bisa di-render)
     clone.style.position = 'absolute';
     clone.style.left = '-9999px';
-    clone.style.width = '210mm'; // A4 width
+    clone.style.width = '210mm';
     clone.style.padding = '10mm';
     clone.style.backgroundColor = '#ffffff';
+    clone.style.fontFamily = 'Verdana, Geneva, Tahoma, sans-serif';
     document.body.appendChild(clone);
 
-    // Strip unsupported colors
     stripUnsupportedColors(clone);
 
     try {
@@ -200,11 +194,9 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Add first page
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
-      // Add additional pages if needed
       while (heightLeft > 0) {
         position -= pageHeight;
         pdf.addPage();
@@ -217,7 +209,6 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
       console.error("Error generating PDF:", error);
       alert("Gagal generate PDF");
     } finally {
-      // Remove clone
       document.body.removeChild(clone);
     }
   };
@@ -390,7 +381,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
                   <td className="text-center">
                     {item.isi_per_palet || "-"}
                   </td>
-                   <td className="text-center py-2">{item.kubik_m3} m³</td>
+                  <td className="text-center py-2">{item.kubik_m3} m³</td>
                   <td className="text-center">{item.pallet_qty}</td>
                   <td className="text-center">{item.total_pcs}</td>
                 </tr>
@@ -422,7 +413,6 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
                         value={returns[item.id]?.qty ?? 0}
                         onChange={(e) => {
                           const val = e.target.value === "" ? 0 : Number(e.target.value);
-
                           setReturns((prev) => ({
                             ...prev,
                             [item.id]: {
@@ -434,7 +424,6 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
                         className="w-16 border text-center"
                       />
                     </span>
-
                     <span className="hidden print:inline">
                       {returns[item.id]?.qty ?? 0}
                     </span>
@@ -448,7 +437,6 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
         <div className="grid grid-cols-3 gap-6 mb-4">
           <div>
             <label className="block font-normal mb-1">No Gudang</label>
-
             <div className="print:hidden">
               <input
                 type="text"
@@ -457,7 +445,6 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             <div className="hidden print:block border-b border-gray-300 py-1">
               {noGudang || "-"}
             </div>
@@ -506,15 +493,12 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           <div className="text-center">
             <p className="font-normal mb-7">Tanda Terima</p>
           </div>
-          
           <div className="text-center">
             <p className="font-normal mb-7">Supir</p>
           </div>
-          
           <div className="text-center">
             <p className="font-normal mb-7">Dibuat Oleh</p>
           </div>
-          
           <div className="text-center">
             <p className="font-normal mb-7">Security</p>
           </div>
@@ -529,14 +513,14 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           }
 
           body {
-            font-family: OCR-B, Consolas, Roboto Mono, sans-serif !important;
-            font-size: 12pt !important;
-            font-weight: 300 !important;
-             letter-spacing: 0.5px;  
+            /* Verdana: dirancang khusus untuk keterbacaan di layar & print.
+               0 (nol) punya oval melebar, 8 punya dua lingkaran seimbang — sangat mudah dibedakan. */
+            font-family: Verdana, Geneva, Tahoma, sans-serif !important;
+            font-size: 11pt !important;
+            font-weight: 400 !important;
+            letter-spacing: 0px;
             color: #000 !important;
-            -webkit-font-smoothing: none !important;
-            -moz-osx-font-smoothing: auto !important;
-            text-rendering: optimizeSpeed !important;
+            -webkit-font-smoothing: antialiased !important;
           }
 
           body * {
@@ -551,6 +535,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
             background: transparent !important;
             box-shadow: none !important;
             filter: none !important;
+            font-family: Verdana, Geneva, Tahoma, sans-serif !important;
           }
 
           #print-content {
@@ -558,13 +543,13 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
             inset: 0;
             padding: 0 !important;
             margin: 0 !important;
-            font-size: 12pt !important;
-            line-height: 1.15 !important;
+            font-size: 11pt !important;
+            line-height: 1.3 !important;
           }
 
           #print-content h1 {
-            font-size: 16pt !important;
-            font-weight: 300 !important;
+            font-size: 18pt !important;
+            font-weight: 700 !important;
             margin: 0 0 4pt 0 !important;
             padding-bottom: 4pt !important;
             border-bottom: 1.2pt solid #000 !important;
@@ -574,7 +559,7 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
           #print-content p,
           #print-content td,
           #print-content th {
-            font-weight: 300 !important;
+            font-weight: 400 !important;
             color: #000 !important;
           }
 
@@ -582,18 +567,18 @@ console.log("🔍 no_gudang === undefined?", json.no_gudang === undefined);
             width: 100%;
             border-collapse: collapse !important;
             border: 1.2pt solid #000 !important;
-            font-size: 11.8pt !important;
+            font-size: 10.5pt !important;
           }
 
           .sj-table th,
           .sj-table td {
             border: 1pt solid #000 !important;
-            padding: 3pt 4pt !important;
+            padding: 3pt 5pt !important;
             vertical-align: middle !important;
           }
 
           .sj-table th {
-            font-weight: 800 !important;
+            font-weight: 700 !important;
             text-align: center;
           }
 

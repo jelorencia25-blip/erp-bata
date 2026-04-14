@@ -102,9 +102,7 @@ export default function SalesOrdersPage() {
 
   useEffect(() => {
     const fetchOrders = async () => {
-
       try {
-
         const data = await getAllRows(
           supabase,
           'v_sales_orders_list',
@@ -112,7 +110,15 @@ export default function SalesOrdersPage() {
           'order_date'
         );
 
-        const sorted = (data || []).sort((a: any, b: any) => {
+        // ✅ FIX: Deduplicate by id sebelum set state
+        const seen = new Set();
+        const deduped = (data || []).filter((row: any) => {
+          if (seen.has(row.id)) return false;
+          seen.add(row.id);
+          return true;
+        });
+
+        const sorted = deduped.sort((a: any, b: any) => {
           if (a.order_date === b.order_date) {
             return (b.so_number || '').localeCompare(a.so_number || '');
           }
@@ -288,61 +294,54 @@ export default function SalesOrdersPage() {
 
       </div>
 
-      {/* SISANYA TABLE + FILTER TETAP PERSIS SAMA SEPERTI CODE KAMU */}
+      {/* FILTERS */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
 
+        <input
+          type="text"
+          placeholder="Filter Nama Supplier"
+          value={filters.customer_name}
+          onChange={(e) => setFilters({ ...filters, customer_name: e.target.value })}
+          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
 
-      {/* FILTERS */}<div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Filter No SO"
+          value={filters.so_number}
+          onChange={(e) => setFilters({ ...filters, so_number: e.target.value })}
+          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
 
-  {/* Supplier */}
-  <input
-    type="text"
-    placeholder="Filter Nama Supplier"
-    value={filters.customer_name}
-    onChange={(e) => setFilters({ ...filters, customer_name: e.target.value })}
-    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-  />
+        <input
+          type="text"
+          placeholder="Filter No SJ"
+          value={filters.sj_number}
+          onChange={(e) => setFilters({ ...filters, sj_number: e.target.value })}
+          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
 
-  {/* No SO */}
-  <input
-    type="text"
-    placeholder="Filter No SO"
-    value={filters.so_number}
-    onChange={(e) => setFilters({ ...filters, so_number: e.target.value })}
-    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-  />
+        <input
+          type="date"
+          value={filters.order_date}
+          onChange={(e) => setFilters({ ...filters, order_date: e.target.value })}
+          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
 
-  {/* No SJ */}
-  <input
-    type="text"
-    placeholder="Filter No SJ"
-    value={filters.sj_number}
-    onChange={(e) => setFilters({ ...filters, sj_number: e.target.value })}
-    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-  />
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          <option value="">All Status</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s.replace('_', ' ')}
+            </option>
+          ))}
+        </select>
 
-  {/* Tanggal */}
-  <input
-    type="date"
-    value={filters.order_date}
-    onChange={(e) => setFilters({ ...filters, order_date: e.target.value })}
-    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-  />
-
-  {/* Status */}
-  <select
-    value={filters.status}
-    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-    className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-  >
-    <option value="">All Status</option>
-    {STATUS_OPTIONS.map((s) => (
-      <option key={s} value={s}>
-        {s.replace('_', ' ')}
-      </option>
-    ))}
-  </select>
-
-</div>
+      </div>
 
       {/* INFO STATE */}
       {loading && <div className="mb-2 text-gray-500">Loading...</div>}
@@ -353,9 +352,7 @@ export default function SalesOrdersPage() {
         <table className="min-w-full bg-white shadow rounded-lg overflow-hidden">
           <thead className="bg-gray-100 text-gray-700 uppercase text-sm">
             <tr>
-              {/* 🔥 NOMOR KOLOM */}
               <th className="p-3 text-left">No</th>
-              
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -374,37 +371,34 @@ export default function SalesOrdersPage() {
           <tbody>
             {filteredOrders.length === 0 && !loading ? (
               <tr>
-                <td colSpan={12} className="p-5 text-center text-gray-400">
+                <td colSpan={13} className="p-5 text-center text-gray-400">
                   Belum ada sales order
                 </td>
               </tr>
             ) : (
               filteredOrders.map((o, index) => (
-                 <tr
-                  key={o.id}
+                // ✅ FIX: Pakai kombinasi id + index sebagai key untuk pastikan selalu unik
+                <tr
+                  key={`${o.id}-${index}`}
                   className={`border-b transition
                     ${ROW_STATUS_CLASS[o.status ?? ""] ?? "bg-white hover:bg-gray-50"}
                   `}
                 >
-                  {/* 🔥 NOMOR URUT */}
                   <td className="p-3 text-gray-600 font-medium">{index + 1}</td>
-                  
                   <td className="p-3">{o.order_date ? new Date(o.order_date).toLocaleDateString('id-ID') : '-'}</td>
                   <td className="p-3 font-medium">{o.so_number ?? '-'}</td>
                   <td className="p-3">{o.sj_numbers ?? '-'}</td>
-                  <td className="p-3">{o.customer_name ?? '-'}</td>
                   <td className="p-3">{o.customer_order_ref ?? '-'}</td>
+                  <td className="p-3">{o.customer_name ?? '-'}</td>
                   <td className="p-3">{o.ship_to_name ?? '-'}</td>
                   <td className="p-3 text-right">{o.total_pcs?.toLocaleString() ?? 0}</td>
                   <td className="p-3">{o.uk ?? '-'}</td>
                   <td className="p-3 text-right">{o.total_price?.toLocaleString('id-ID') ?? 0}</td>
-                  
                   <td className="p-3 text-center">
                     <PurchaseBadge type={o.purchase_type} />
                   </td>
-
                   <td className="p-3">
-                   <select
+                    <select
                       value={o.status ?? ''}
                       onChange={(e) => handleStatusChange(o.id, e.target.value)}
                       className={`px-2 py-1 rounded border text-sm font-semibold

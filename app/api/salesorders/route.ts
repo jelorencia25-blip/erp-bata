@@ -13,7 +13,8 @@ export async function GET() {
   );
 
   try {
-    // 1️⃣ Ambil Sales Orders (tetap seperti sekarang)
+    // ✅ FIX: Hindari select relasi yang bisa duplikat row
+    // Ambil customer_name dan deposit_code langsung via join manual / kolom flat
     const { data, error } = await supabase
       .from("sales_orders")
       .select(`
@@ -25,7 +26,7 @@ export async function GET() {
 
     if (error) throw error;
 
-    // 2️⃣ Ambil semua SJ berdasarkan sales_order_id
+    // Ambil semua SJ berdasarkan sales_order_id
     const soIds = data.map((so: any) => so.id);
 
     let sjMap: Record<string, string[]> = {};
@@ -46,19 +47,30 @@ export async function GET() {
       });
     }
 
-    // 3️⃣ Transform + merge SJ
+    // ✅ FIX: Transform dengan handle array customers/deposits dengan benar
     const transformed = data.map((so: any) => ({
       ...so,
-      customer_name: so.customers?.[0]?.name || '-',
-      deposit_code: so.deposits?.[0]?.deposit_code || '-',
-
-      // 🔥 TAMBAHAN SJ
+      // customers bisa berupa array (one-to-many) atau object, handle keduanya
+      customer_name: Array.isArray(so.customers)
+        ? so.customers[0]?.name || '-'
+        : so.customers?.name || '-',
+      deposit_code: Array.isArray(so.deposits)
+        ? so.deposits[0]?.deposit_code || '-'
+        : so.deposits?.deposit_code || '-',
       sj_numbers: sjMap[so.id]
         ? [...new Set(sjMap[so.id])].join(', ')
         : '-'
     }));
 
-    return NextResponse.json(transformed);
+    // ✅ FIX: Deduplicate by id sebelum return
+    const seen = new Set();
+    const deduped = transformed.filter((row: any) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+
+    return NextResponse.json(deduped);
 
   } catch (err: any) {
     console.error("GET SALES ORDERS ERROR:", err);
@@ -95,7 +107,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabase.rpc("rpc_create_sales_order", {
       p_customer_id: body.customer_id,
-      p_order_date: body.order_date, // 🔥 WAJIB
+      p_order_date: body.order_date,
       p_customer_order_ref: body.customer_order_ref ?? null,
       p_ship_to_name: body.ship_to_name ?? null,
       p_contact_phone: body.contact_phone ?? null,
@@ -113,7 +125,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       id: data,
       message: "Sales Order created successfully"
     });

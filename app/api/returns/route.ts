@@ -10,14 +10,30 @@ export async function GET() {
   );
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from("v_returns_page")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (error) throw error;
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin
+        .from("v_returns_page")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
 
-    return NextResponse.json(data ?? []);
+      if (error) throw error;
+
+      allData = allData.concat(data ?? []);
+
+      if (!data || data.length < PAGE_SIZE) {
+        hasMore = false;
+      } else {
+        from += PAGE_SIZE;
+      }
+    }
+
+    return NextResponse.json(allData);
   } catch (err: any) {
     console.error("RETURNS API ERROR:", err);
     return NextResponse.json(
