@@ -9,41 +9,58 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data, error } = await supabase
-    .from("delivery_orders")
-    .select(`
-      id,
-      delivery_date,
-      sj_number,
-      final_status,
-      sales_orders!inner (
-        so_number,
-        ship_to_name,
-        delivery_address,
-        status,
-        customers ( name ),
-        sales_order_items (
-          total_pcs,
-          pallet_qty,
-          total_m3,
-          products (
-            ukuran
-          )
-        )
-      ),
-      delivery_return_items ( return_pcs ),
-      staff:staff!delivery_orders_driver_id_fkey ( name ),
-      vehicles ( plate_number )
-    `)
-    .not("sj_number", "is", null)
-    .order("created_at", { ascending: false });
+  const PAGE_SIZE = 1000;
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
 
-  if (error) {
-    console.error(error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("delivery_orders")
+      .select(`
+        id,
+        delivery_date,
+        sj_number,
+        final_status,
+        sales_orders!inner (
+          so_number,
+          ship_to_name,
+          delivery_address,
+          status,
+          customers ( name ),
+          sales_order_items (
+            total_pcs,
+            pallet_qty,
+            total_m3,
+            products (
+              ukuran
+            )
+          )
+        ),
+        delivery_return_items ( return_pcs ),
+        staff:staff!delivery_orders_driver_id_fkey ( name ),
+        vehicles ( plate_number )
+      `)
+      .not("sj_number", "is", null)
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error(error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const batch = data ?? [];
+    allData = allData.concat(batch);
+
+    if (batch.length < PAGE_SIZE) {
+      hasMore = false;
+    } else {
+      from += PAGE_SIZE;
+    }
   }
 
-  const result = (data ?? [])
+  const result = allData
     .filter((d: any) => d.sales_orders?.status !== "cancelled")
     .map((d: any) => {
       const so = d.sales_orders;
@@ -55,7 +72,6 @@ export async function GET() {
 
       const ukuranSet = new Set<string>();
 
-      // SALES ORDER ITEMS
       for (const item of so?.sales_order_items ?? []) {
         totalPcs += Number(item.total_pcs || 0);
         totalPalet += Number(item.pallet_qty || 0);
@@ -66,7 +82,6 @@ export async function GET() {
         }
       }
 
-      // DELIVERY RETURNS
       for (const r of d.delivery_return_items ?? []) {
         totalReturn += Number(r.return_pcs || 0);
       }

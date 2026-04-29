@@ -126,7 +126,7 @@ const [filterAction, setFilterAction] = useState<
     }
 
     return sortDir === "asc"
-      ? String(aVal).localeCompare(String(aVal))
+      ? String(aVal).localeCompare(String(bVal))
       : String(bVal).localeCompare(String(aVal));
   });
 
