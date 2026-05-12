@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { getAllRows } from "@/lib/lib/getAllRows";
 
 export async function GET(req: Request) {
   const supabase = createClient(
@@ -15,85 +14,156 @@ export async function GET(req: Request) {
     const dateFrom = searchParams.get("date_from");
     const dateTo = searchParams.get("date_to");
 
-    // =============================
-    // 1. DELIVERY ORDERS
-    // =============================
-    const allDeliveries = await getAllRows(
-      supabase,
-      "delivery_orders",
-      "id, sj_number, delivery_date, sales_order_id, final_status",
-      "delivery_date"
-    );
+    console.log("🚀 Starting rekap fetch...");
 
+    // =============================
+    // 1. DELIVERY ORDERS - MANUAL PAGINATION
+    // =============================
+    let allDeliveries: any[] = [];
+    let from = 0;
+    const batch = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("delivery_orders")
+        .select("id, sj_number, delivery_date, sales_order_id, final_status")
+        .range(from, from + batch - 1)
+        .order("id", { ascending: true });
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allDeliveries.push(...data);
+      if (data.length < batch) break;
+      from += batch;
+    }
+
+    console.log(`✅ Total deliveries: ${allDeliveries.length}`);
+
+    // Filter final + date range
     let deliveries = allDeliveries.filter((d: any) => d.final_status === "final");
-
     if (dateFrom) deliveries = deliveries.filter((d: any) => d.delivery_date && d.delivery_date >= dateFrom);
     if (dateTo) deliveries = deliveries.filter((d: any) => d.delivery_date && d.delivery_date <= dateTo);
+
+    console.log(`✅ Final deliveries (after date filter): ${deliveries.length}`);
 
     if (deliveries.length === 0) return NextResponse.json([]);
 
     const doIds = deliveries.map((d: any) => d.id);
     const soIds = [...new Set(deliveries.map((d: any) => d.sales_order_id).filter(Boolean))] as string[];
 
-    // =============================
-    // 2. SALES ORDERS
-    // =============================
-    const allSO = await getAllRows(
-      supabase,
-      "sales_orders",
-      "id, so_number, order_date, customer_id, ship_to_name, deposit_id",
-      "id"
-    );
+    console.log(`🔗 Unique SO IDs: ${soIds.length}`);
 
-    const salesOrders = allSO.filter((s: any) => soIds.includes(s.id));
+    // =============================
+    // 2. SALES ORDERS - BATCH FETCH
+    // =============================
+    const salesOrders: any[] = [];
+    const soChunkSize = 100;
+
+    for (let i = 0; i < soIds.length; i += soChunkSize) {
+      const chunk = soIds.slice(i, i + soChunkSize);
+      
+      const { data, error } = await supabase
+        .from("sales_orders")
+        .select("id, so_number, order_date, customer_id, ship_to_name, deposit_id")
+        .in("id", chunk);
+
+      if (error) {
+        console.error(`❌ SO batch ${i} error:`, error);
+        continue;
+      }
+
+      if (data) salesOrders.push(...data);
+    }
+
     const soMap = new Map(salesOrders.map((s: any) => [s.id, s]));
+    console.log(`✅ Sales orders: ${salesOrders.length}`);
 
     // =============================
-    // 3. CUSTOMERS
+    // 3. CUSTOMERS - BATCH FETCH
     // =============================
     const customerIds = [...new Set(salesOrders.map((s: any) => s.customer_id).filter(Boolean))] as string[];
-    const allCustomers = await getAllRows(supabase, "customers", "id, name", "id");
-    const customerMap = new Map(
-      allCustomers
-        .filter((c: any) => customerIds.includes(c.id))
-        .map((c: any) => [c.id, c.name])
-    );
+    const customers: any[] = [];
+    const custChunkSize = 100;
+
+    for (let i = 0; i < customerIds.length; i += custChunkSize) {
+      const chunk = customerIds.slice(i, i + custChunkSize);
+      
+      const { data } = await supabase
+        .from("customers")
+        .select("id, name")
+        .in("id", chunk);
+
+      if (data) customers.push(...data);
+    }
+
+    const customerMap = new Map(customers.map((c: any) => [c.id, c.name]));
+    console.log(`✅ Customers: ${customers.length}`);
 
     // =============================
-    // 4. DEPOSITS
+    // 4. DEPOSITS - BATCH FETCH
     // =============================
     const depositIds = [...new Set(salesOrders.map((s: any) => s.deposit_id).filter(Boolean))] as string[];
     const depositMap = new Map<string, string>();
 
     if (depositIds.length > 0) {
-      const allDeposits = await getAllRows(supabase, "deposits", "id, deposit_code", "id");
-      allDeposits
-        .filter((d: any) => depositIds.includes(d.id))
-        .forEach((d: any) => depositMap.set(d.id, d.deposit_code));
+      const deposits: any[] = [];
+      const depChunkSize = 100;
+
+      for (let i = 0; i < depositIds.length; i += depChunkSize) {
+        const chunk = depositIds.slice(i, i + depChunkSize);
+        
+        const { data } = await supabase
+          .from("deposits")
+          .select("id, deposit_code")
+          .in("id", chunk);
+
+        if (data) deposits.push(...data);
+      }
+
+      deposits.forEach((d: any) => depositMap.set(d.id, d.deposit_code));
+      console.log(`✅ Deposits: ${deposits.length}`);
     }
 
     // =============================
-    // 5. SALES ORDER ITEMS
+    // 5. SALES ORDER ITEMS - BATCH FETCH
     // =============================
-    const allSOItems = await getAllRows(
-      supabase,
-      "sales_order_items",
-      "sales_order_id, product_id, pallet_qty, total_pcs, price_per_m3, total_price",
-      "sales_order_id"
-    );
+    const soItems: any[] = [];
+    const soItemChunkSize = 100;
 
-    const soItems = allSOItems.filter((i: any) => soIds.includes(i.sales_order_id));
+    for (let i = 0; i < soIds.length; i += soItemChunkSize) {
+      const chunk = soIds.slice(i, i + soItemChunkSize);
+      
+      const { data } = await supabase
+        .from("sales_order_items")
+        .select("sales_order_id, product_id, pallet_qty, total_pcs, price_per_m3, total_price")
+        .in("sales_order_id", chunk);
+
+      if (data) soItems.push(...data);
+    }
+
+    console.log(`✅ SO Items: ${soItems.length}`);
 
     // =============================
-    // 6. PRODUCTS
+    // 6. PRODUCTS - BATCH FETCH
     // =============================
     const productIds = [...new Set(soItems.map((i: any) => i.product_id).filter(Boolean))] as string[];
-    const allProducts = await getAllRows(supabase, "products", "id, name, ukuran", "id");
-    const productMap = new Map(
-      allProducts
-        .filter((p: any) => productIds.includes(p.id))
-        .map((p: any) => [p.id, p])
-    );
+    const products: any[] = [];
+    const prodChunkSize = 100;
+
+    for (let i = 0; i < productIds.length; i += prodChunkSize) {
+      const chunk = productIds.slice(i, i + prodChunkSize);
+      
+      const { data } = await supabase
+        .from("products")
+        .select("id, name, ukuran")
+        .in("id", chunk);
+
+      if (data) products.push(...data);
+    }
+
+    const productMap = new Map(products.map((p: any) => [p.id, p]));
+    console.log(`✅ Products: ${products.length}`);
 
     // =============================
     // 7. AGGREGATE SO ITEMS per SO
@@ -124,16 +194,23 @@ export async function GET(req: Request) {
     }
 
     // =============================
-    // 8. RETURNS per DO
+    // 8. RETURNS per DO - BATCH FETCH
     // =============================
-    const allReturns = await getAllRows(
-      supabase,
-      "delivery_return_items",
-      "delivery_order_id, product_id, return_pcs",
-      "delivery_order_id"
-    );
+    const returnItems: any[] = [];
+    const retChunkSize = 100;
 
-    const returnItems = allReturns.filter((r: any) => doIds.includes(r.delivery_order_id));
+    for (let i = 0; i < doIds.length; i += retChunkSize) {
+      const chunk = doIds.slice(i, i + retChunkSize);
+      
+      const { data } = await supabase
+        .from("delivery_return_items")
+        .select("delivery_order_id, product_id, return_pcs")
+        .in("delivery_order_id", chunk);
+
+      if (data) returnItems.push(...data);
+    }
+
+    console.log(`✅ Return items: ${returnItems.length}`);
 
     const doReturPcsMap = new Map<string, number>();
     const doReturRupiahMap = new Map<string, number>();
@@ -155,20 +232,24 @@ export async function GET(req: Request) {
     }
 
     // =============================
-    // 9. PAYMENTS (paid_at)
+    // 9. PAYMENTS - BATCH FETCH
     // =============================
-    const allPayments = await getAllRows(
-      supabase,
-      "payments",
-      "delivery_order_id, status, paid_at",
-      "delivery_order_id"
-    );
+    const payments: any[] = [];
+    const payChunkSize = 100;
 
-    const paymentMap = new Map(
-      allPayments
-        .filter((p: any) => doIds.includes(p.delivery_order_id))
-        .map((p: any) => [p.delivery_order_id, p])
-    );
+    for (let i = 0; i < doIds.length; i += payChunkSize) {
+      const chunk = doIds.slice(i, i + payChunkSize);
+      
+      const { data } = await supabase
+        .from("payments")
+        .select("delivery_order_id, status, paid_at")
+        .in("delivery_order_id", chunk);
+
+      if (data) payments.push(...data);
+    }
+
+    const paymentMap = new Map(payments.map((p: any) => [p.delivery_order_id, p]));
+    console.log(`✅ Payments: ${payments.length}`);
 
     // =============================
     // 10. BUILD ROWS
@@ -201,15 +282,17 @@ export async function GET(req: Request) {
         harga_m3: hargaArr.length > 0 ? hargaArr[0] : null,
         jumlah_retur: doReturPcsMap.get(doKey) || 0,
         tagihan,
-        payment_date: (paymentMap.get(doKey) as any)?.paid_at ?? null, // ✅ dari tabel payments
-        status: (paymentMap.get(doKey) as any)?.status ?? "unpaid", // ✅ tambah ini
+        payment_date: (paymentMap.get(doKey) as any)?.paid_at ?? null,
+        status: (paymentMap.get(doKey) as any)?.status ?? "unpaid",
       };
     });
+
+    console.log(`✅ Final rows: ${rows.length}`);
 
     return NextResponse.json(rows);
 
   } catch (err: any) {
-    console.error("REKAP ERROR:", err);
+    console.error("❌ REKAP ERROR:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
