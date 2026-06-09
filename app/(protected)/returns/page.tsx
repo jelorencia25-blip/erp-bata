@@ -19,6 +19,7 @@ type ReturnRow = {
   return_pcs: number;
   total: number;
   return_reason: string;
+  purchase_type: string | null;
 };
 
 type SortKey = keyof ReturnRow | null;
@@ -36,6 +37,7 @@ export default function ReturnsPage() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [purchaseTypeFilter, setPurchaseTypeFilter] = useState<'all' | 'Locco' | 'Franco'>('all');
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -56,12 +58,10 @@ export default function ReturnsPage() {
     load();
   }, []);
 
-  // Reset ke halaman 1 kalau filter/sort berubah
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, dateFrom, dateTo, sortKey, sortOrder]);
+  }, [search, dateFrom, dateTo, sortKey, sortOrder, purchaseTypeFilter]);
 
-  /* ================= FILTER + SORT ================= */
   const filteredData = useMemo(() => {
     let result = [...data];
 
@@ -85,6 +85,10 @@ export default function ReturnsPage() {
         const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
         return (!from || rowDate >= from) && (!to || rowDate <= to);
       });
+    }
+
+    if (purchaseTypeFilter !== 'all') {
+      result = result.filter((r) => r.purchase_type === purchaseTypeFilter);
     }
 
     if (sortKey) {
@@ -112,9 +116,8 @@ export default function ReturnsPage() {
     }
 
     return result;
-  }, [data, search, dateFrom, dateTo, sortKey, sortOrder]);
+  }, [data, search, dateFrom, dateTo, sortKey, sortOrder, purchaseTypeFilter]);
 
-  /* ================= PAGINATION ================= */
   const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
 
   const paginatedData = filteredData.slice(
@@ -137,11 +140,9 @@ export default function ReturnsPage() {
       return acc;
     }, []);
 
-  /* ================= TOTALS (selalu dari filteredData) ================= */
   const totalPcs = filteredData.reduce((s, r) => s + r.return_pcs, 0);
   const grandTotal = filteredData.reduce((s, r) => s + r.total, 0);
 
-  /* ================= SORT HANDLER ================= */
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -156,7 +157,6 @@ export default function ReturnsPage() {
     return sortOrder === 'asc' ? '↑' : '↓';
   };
 
-  /* ================= EXCEL ================= */
   const downloadExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(
       filteredData.map((r, i) => ({
@@ -167,6 +167,7 @@ export default function ReturnsPage() {
         'No SJ': r.sj_number,
         'No SO': r.so_number,
         Supplier: r.customer_name,
+        'Tipe Pembelian': r.purchase_type ?? '-',
         Barang: r.product_name,
         Ukuran: r.ukuran,
         'Harga Satuan': r.harga_satuan,
@@ -201,8 +202,7 @@ export default function ReturnsPage() {
 
   return (
     <div className="p-8">
-      {/* ===== HEADER ===== */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-bold mb-1">Data Retur</h1>
           <p className="text-gray-600">
@@ -211,6 +211,7 @@ export default function ReturnsPage() {
           </p>
         </div>
 
+        {/* Filter baris 1: search + date */}
         <div className="flex flex-col md:flex-row gap-2">
           <input
             type="text"
@@ -236,6 +237,7 @@ export default function ReturnsPage() {
               setSearch('');
               setDateFrom('');
               setDateTo('');
+              setPurchaseTypeFilter('all');
             }}
             className="bg-gray-200 hover:bg-gray-300 rounded px-3 py-2 text-sm"
           >
@@ -248,9 +250,26 @@ export default function ReturnsPage() {
             Download Excel
           </button>
         </div>
+
+        {/* Filter baris 2: purchase type */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600 font-medium">Tipe Pembelian:</span>
+          {(['all', 'Locco', 'Franco'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setPurchaseTypeFilter(type)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                purchaseTypeFilter === type
+                  ? 'bg-gray-800 text-white border-gray-800'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              {type === 'all' ? 'Semua' : type}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ===== TABEL ===== */}
       <div className="overflow-x-auto shadow-lg rounded-lg border border-gray-200">
         <table className="w-full text-sm border-collapse">
           <thead className="bg-gray-800 text-white">
@@ -264,6 +283,7 @@ export default function ReturnsPage() {
                   ['sj_number', 'No SJ'],
                   ['so_number', 'No SO'],
                   ['customer_name', 'Supplier'],
+                  ['purchase_type', 'Tipe'],
                   ['product_name', 'Barang'],
                   ['ukuran', 'Ukuran'],
                   ['harga_satuan', 'Harga'],
@@ -302,6 +322,19 @@ export default function ReturnsPage() {
                 <td className="px-4 py-2">{row.sj_number}</td>
                 <td className="px-4 py-2">{row.so_number}</td>
                 <td className="px-4 py-2">{row.customer_name}</td>
+                <td className="px-4 py-2 text-center">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      row.purchase_type === 'Franco'
+                        ? 'bg-blue-100 text-blue-700'
+                        : row.purchase_type === 'Locco'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {row.purchase_type ?? '-'}
+                  </span>
+                </td>
                 <td className="px-4 py-2">{row.product_name}</td>
                 <td className="px-4 py-2 text-center">{row.ukuran}</td>
                 <td className="px-4 py-2 text-right">
@@ -318,11 +351,10 @@ export default function ReturnsPage() {
             ))}
           </tbody>
 
-          {/* ===== FOOTER TOTAL ===== */}
           <tfoot className="bg-gray-100 font-bold">
             <tr>
               <td
-                colSpan={9}
+                colSpan={10}
                 className="px-4 py-3 text-right border-t-2 border-gray-300"
               >
                 TOTAL HARGA RETUR
@@ -338,7 +370,6 @@ export default function ReturnsPage() {
         </table>
       </div>
 
-      {/* ===== PAGINATION ===== */}
       {totalPages > 1 && (
         <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-sm text-gray-600">
@@ -353,7 +384,6 @@ export default function ReturnsPage() {
           </p>
 
           <div className="flex items-center gap-1 flex-wrap">
-            {/* First */}
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
@@ -361,8 +391,6 @@ export default function ReturnsPage() {
             >
               «
             </button>
-
-            {/* Prev */}
             <button
               onClick={() => setCurrentPage((p) => p - 1)}
               disabled={currentPage === 1}
@@ -370,8 +398,6 @@ export default function ReturnsPage() {
             >
               ‹ Prev
             </button>
-
-            {/* Page numbers */}
             {pageNumbers.map((item, idx) =>
               item === 'ellipsis' ? (
                 <span key={`e-${idx}`} className="px-2 py-1 text-sm text-gray-400">
@@ -391,8 +417,6 @@ export default function ReturnsPage() {
                 </button>
               )
             )}
-
-            {/* Next */}
             <button
               onClick={() => setCurrentPage((p) => p + 1)}
               disabled={currentPage === totalPages}
@@ -400,8 +424,6 @@ export default function ReturnsPage() {
             >
               Next ›
             </button>
-
-            {/* Last */}
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
