@@ -1,110 +1,76 @@
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function GET() {
+const ALLOWED_SORT_COLUMNS = new Set([
+  'delivery_date', 'no_gudang' , 'sj_number', 'so_number', 'pelanggan', 'kepada',
+  'ukuran', 'total_pcs', 'palet', 'total_m3', 'return_pcs', 'supir', 'plat_mobil'
+]);
+
+export async function GET(request: Request) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const PAGE_SIZE = 1000;
-  let allData: any[] = [];
-  let from = 0;
-  let hasMore = true;
+  try {
+    const { searchParams } = new URL(request.url);
 
-  while (hasMore) {
-    const { data, error } = await supabase
-      .from("delivery_orders")
-      .select(`
-        id,
-        delivery_date,
-        sj_number,
-        final_status,
-        sales_orders!inner (
-          so_number,
-          ship_to_name,
-          delivery_address,
-          status,
-          customers ( name ),
-          sales_order_items (
-            total_pcs,
-            pallet_qty,
-            total_m3,
-            products (
-              ukuran
-            )
-          )
-        ),
-        delivery_return_items ( return_pcs ),
-        staff:staff!delivery_orders_driver_id_fkey ( name ),
-        vehicles ( plate_number )
-      `)
-      .not("sj_number", "is", null)
-      .order("created_at", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+    const pageSize = Math.min(500, Math.max(1, parseInt(searchParams.get('pageSize') ?? '100', 10)));
+    const search = searchParams.get('search')?.trim() ?? '';
+    const filterSO = searchParams.get('so')?.trim() ?? '';
+    const filterAction = searchParams.get('action') ?? 'all'; // all | done | final
+    const sortByRaw = searchParams.get('sortBy') ?? 'delivery_date';
+    const sortBy = ALLOWED_SORT_COLUMNS.has(sortByRaw) ? sortByRaw : 'delivery_date';
+    const ascending = searchParams.get('sortDir') === 'asc';
+
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from('v_deliveries_processed_list')
+      .select('*', { count: 'exact' });
+
+    if (search) {
+      const kw = `%${search}%`;
+      query = query.or(
+        `sj_number.ilike.${kw},pelanggan.ilike.${kw},kepada.ilike.${kw},supir.ilike.${kw},plat_mobil.ilike.${kw}`
+      );
+    }
+
+    if (filterSO) {
+      query = query.ilike('so_number', `%${filterSO}%`);
+    }
+
+    if (filterAction === 'done') {
+      query = query.eq('final_status', 'draft');
+    } else if (filterAction === 'final') {
+      query = query.eq('final_status', 'final');
+    }
+
+    query = query
+      .order(sortBy, { ascending })
+      .order('id', { ascending: true }) // tiebreaker biar pagination stabil
+      .range(from, to);
+
+    const { data, error, count } = await query;
 
     if (error) {
-      console.error(error);
+      console.error('GET DELIVERIES PROCESSED ERROR:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const batch = data ?? [];
-    allData = allData.concat(batch);
-
-    if (batch.length < PAGE_SIZE) {
-      hasMore = false;
-    } else {
-      from += PAGE_SIZE;
-    }
-  }
-
-  const result = allData
-    .filter((d: any) => d.sales_orders?.status !== "cancelled")
-    .map((d: any) => {
-      const so = d.sales_orders;
-
-      let totalPcs = 0;
-      let totalPalet = 0;
-      let totalM3 = 0;
-      let totalReturn = 0;
-
-      const ukuranSet = new Set<string>();
-
-      for (const item of so?.sales_order_items ?? []) {
-        totalPcs += Number(item.total_pcs || 0);
-        totalPalet += Number(item.pallet_qty || 0);
-        totalM3 += Number(item.total_m3 || 0);
-
-        if (item.products?.ukuran) {
-          ukuranSet.add(item.products.ukuran);
-        }
-      }
-
-      for (const r of d.delivery_return_items ?? []) {
-        totalReturn += Number(r.return_pcs || 0);
-      }
-
-      return {
-        id: d.id,
-        delivery_date: d.delivery_date,
-        final_status: d.final_status,
-        sj_number: d.sj_number,
-        so_number: so?.so_number ?? "-",
-        pelanggan: so?.customers?.name ?? "-",
-        kepada: so?.ship_to_name ?? "-",
-        alamat: so?.delivery_address ?? "-",
-        ukuran: Array.from(ukuranSet).join(", "),
-        total_pcs: totalPcs,
-        return_pcs: totalReturn,
-        palet: totalPalet,
-        total_m3: totalM3,
-        supir: d.staff?.name ?? "-",
-        plat_mobil: d.vehicles?.plate_number ?? "-",
-        so_status: so?.status,
-      };
+    return NextResponse.json({
+      data: data ?? [],
+      total: count ?? 0,
+      page,
+      pageSize,
     });
 
-  return NextResponse.json(result);
+  } catch (err: any) {
+    console.error('GET DELIVERIES PROCESSED ERROR:', err);
+    return NextResponse.json({ error: err.message ?? 'Unknown error' }, { status: 500 });
+  }
 }

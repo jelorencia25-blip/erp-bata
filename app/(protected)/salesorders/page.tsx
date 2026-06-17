@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/lib/supabase';
-import { getAllRows } from '@/lib/lib/getAllRows';
 import Link from 'next/link';
 
 type SalesOrder = {
   id: string;
-  sales_order_id: string;
   order_date: string;
   so_number: string | null;
   customer_order_ref: string | null;
@@ -21,6 +19,20 @@ type SalesOrder = {
   sj_numbers?: string;
 };
 
+type Summary = {
+  total_orders: number;
+  total_value: number;
+  total_pcs: number;
+  franco_count: number;
+  franco_value: number;
+  locco_count: number;
+  locco_value: number;
+  pending_count: number;
+  in_delivery_count: number;
+  completed_count: number;
+  cancelled_count: number;
+};
+
 const ROW_STATUS_CLASS: Record<string, string> = {
   cancelled: "bg-red-200 text-red-900 hover:bg-red-300",
   in_delivery: "bg-yellow-200 text-yellow-900 hover:bg-yellow-300",
@@ -29,22 +41,13 @@ const ROW_STATUS_CLASS: Record<string, string> = {
 };
 
 const STATUS_OPTIONS = ['pending', 'in_delivery', 'completed', 'cancelled'];
+const PAGE_SIZE = 100;
 
 function formatMoney(n: number) {
   if (!n) return "Rp 0";
-
-  if (n >= 1_000_000_000) {
-    return `Rp ${(n / 1_000_000_000).toFixed(1)}B`;
-  }
-
-  if (n >= 1_000_000) {
-    return `Rp ${(n / 1_000_000).toFixed(1)}M`;
-  }
-
-  if (n >= 1_000) {
-    return `Rp ${(n / 1_000).toFixed(1)}K`;
-  }
-
+  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(1)}K`;
   return `Rp ${n.toLocaleString("id-ID")}`;
 }
 
@@ -56,13 +59,8 @@ function StatusBadge({ status }: { status: string | null }) {
     completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
   };
-
   return (
-    <span
-      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-        status ? map[status] || 'bg-gray-200 text-gray-800' : 'bg-gray-200 text-gray-800'
-      }`}
-    >
+    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status ? map[status] || 'bg-gray-200 text-gray-800' : 'bg-gray-200 text-gray-800'}`}>
       {status ? status.replace('_', ' ') : '-'}
     </span>
   );
@@ -70,17 +68,9 @@ function StatusBadge({ status }: { status: string | null }) {
 
 function PurchaseBadge({ type }: { type: string | null }) {
   if (!type) return <span className="text-gray-400">-</span>;
-
   const isFranco = type === 'Franco';
-
   return (
-    <span
-      className={`px-3 py-1 rounded-full text-xs font-semibold
-        ${isFranco
-          ? 'bg-green-100 text-green-700'
-          : 'bg-orange-100 text-orange-700'}
-      `}
-    >
+    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${isFranco ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
       {type.toUpperCase()}
     </span>
   );
@@ -88,119 +78,99 @@ function PurchaseBadge({ type }: { type: string | null }) {
 
 export default function SalesOrdersPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filters, setFilters] = useState({
-    customer_name: '',
-    order_date: '',
-    status: '',
-    so_number: '',
-    sj_number: '',
+  const [summary, setSummary] = useState<Summary | null>(null);
+
+  // text filters (debounced)
+  const [textFilters, setTextFilters] = useState({ customer_name: '', so_number: '', sj_number: '' });
+  const [debouncedTextFilters, setDebouncedTextFilters] = useState(textFilters);
+
+  // discrete filters (applied immediately)
+  const [orderDate, setOrderDate] = useState('');
+  const [status, setStatus] = useState('');
+
+  const [sortConfig, setSortConfig] = useState<{ key: keyof SalesOrder; direction: 'asc' | 'desc' }>({
+    key: 'order_date',
+    direction: 'desc',
   });
 
-  const [sortConfig, setSortConfig] = useState<{ key: keyof SalesOrder; direction: 'asc' | 'desc' } | null>(null);
+  // debounce text filters; reset page bersamaan saat debounce settle
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedTextFilters(textFilters);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [textFilters]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase.from('v_sales_orders_list').select('*', { count: 'exact' });
+
+      if (debouncedTextFilters.customer_name) query = query.ilike('customer_name', `%${debouncedTextFilters.customer_name}%`);
+      if (debouncedTextFilters.so_number) query = query.ilike('so_number', `%${debouncedTextFilters.so_number}%`);
+      if (debouncedTextFilters.sj_number) query = query.ilike('sj_numbers', `%${debouncedTextFilters.sj_number}%`);
+      if (orderDate) query = query.eq('order_date', orderDate);
+      if (status) query = query.eq('status', status);
+
+      query = query
+        .order(sortConfig.key, { ascending: sortConfig.direction === 'asc' })
+        .order('id', { ascending: true })
+        .range(from, to);
+
+      const { data, error: queryError, count } = await query;
+      if (queryError) throw queryError;
+
+      setOrders(data ?? []);
+      setTotal(count ?? 0);
+
+      const { data: summaryRows, error: summaryError } = await supabase.rpc('get_so_summary', {
+        p_customer_name: debouncedTextFilters.customer_name || null,
+        p_so_number: debouncedTextFilters.so_number || null,
+        p_sj_number: debouncedTextFilters.sj_number || null,
+        p_order_date: orderDate || null,
+        p_status: status || null,
+      });
+      if (summaryError) throw summaryError;
+      setSummary(summaryRows?.[0] ?? null);
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message);
+    }
+    setLoading(false);
+  }, [page, sortConfig, debouncedTextFilters, orderDate, status]);
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const data = await getAllRows(
-          supabase,
-          'v_sales_orders_list',
-          '*',
-          'order_date'
-        );
+    fetchData();
+  }, [fetchData]);
 
-        // ✅ FIX: Deduplicate by id sebelum set state
-        const seen = new Set();
-        const deduped = (data || []).filter((row: any) => {
-          if (seen.has(row.id)) return false;
-          seen.add(row.id);
-          return true;
-        });
-
-        const sorted = deduped.sort((a: any, b: any) => {
-          if (a.order_date === b.order_date) {
-            return (b.so_number || '').localeCompare(a.so_number || '');
-          }
-          return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-        });
-
-        setOrders(sorted);
-
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message);
-      }
-
-      setLoading(false);
-    };
-
-    fetchOrders();
-  }, []);
-
-  let filteredOrders = orders.filter((o) => {
-    const customerName = o.customer_name || '';
-    const orderDate = o.order_date || '';
-    const status = o.status || '';
-    const soNumber = o.so_number || '';
-    const sjNumber = o.sj_numbers || '';
-
-    return (
-      customerName.toLowerCase().includes(filters.customer_name.toLowerCase()) &&
-      soNumber.toLowerCase().includes(filters.so_number.toLowerCase()) &&
-      sjNumber.toLowerCase().includes(filters.sj_number.toLowerCase()) &&
-      (filters.order_date ? orderDate.startsWith(filters.order_date) : true) &&
-      (filters.status ? status.toLowerCase() === filters.status.toLowerCase() : true)
-    );
-  });
-
-  if (sortConfig) {
-    filteredOrders = [...filteredOrders].sort((a, b) => {
-      const aValue = a[sortConfig.key] ?? '';
-      const bValue = b[sortConfig.key] ?? '';
-
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-
-      return sortConfig.direction === 'asc'
-        ? String(aValue).localeCompare(String(bValue))
-        : String(bValue).localeCompare(String(aValue));
-    });
-  }
+  const updateOrderDate = (value: string) => { setOrderDate(value); setPage(1); };
+  const updateStatusFilter = (value: string) => { setStatus(value); setPage(1); };
 
   const requestSort = (key: keyof SalesOrder) => {
-    if (sortConfig?.key === key) {
-      setSortConfig({ key, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' });
-    } else {
-      setSortConfig({ key, direction: 'asc' });
-    }
+    setSortConfig(prev =>
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' }
+    );
+    setPage(1);
   };
 
   const getSortIcon = (key: keyof SalesOrder) => {
-    if (sortConfig?.key !== key) return <span className="text-gray-400 ml-1">⇅</span>;
+    if (sortConfig.key !== key) return <span className="text-gray-400 ml-1">⇅</span>;
     return sortConfig.direction === 'asc'
       ? <span className="text-gray-600 ml-1">▲</span>
       : <span className="text-gray-600 ml-1">▼</span>;
   };
-
-  const totalOrders = filteredOrders.length;
-  const totalValue = filteredOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
-  const totalPCS = filteredOrders.reduce((sum, o) => sum + (o.total_pcs || 0), 0);
-
-  const francoOrders = filteredOrders.filter(o => o.purchase_type === 'Franco');
-  const loccoOrders = filteredOrders.filter(o => o.purchase_type === 'Locco');
-
-  const francoCount = francoOrders.length;
-  const francoValue = francoOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
-
-  const loccoCount = loccoOrders.length;
-  const loccoValue = loccoOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
-
-  const pendingCount = filteredOrders.filter(o => o.status === 'pending').length;
-  const inDeliveryCount = filteredOrders.filter(o => o.status === 'in_delivery').length;
-  const completedCount = filteredOrders.filter(o => o.status === 'completed').length;
-  const cancelledCount = filteredOrders.filter(o => o.status === 'cancelled').length;
 
   const columns: { key: keyof SalesOrder; label: string; align?: string }[] = [
     { key: 'order_date', label: 'Tgl Order' },
@@ -217,137 +187,111 @@ export default function SalesOrdersPage() {
   ];
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    const { error } = await supabase
-      .from('sales_orders')
-      .update({ status: newStatus })
-      .eq('id', id);
-
+    const { error } = await supabase.from('sales_orders').update({ status: newStatus }).eq('id', id);
     if (error) {
       console.error(error);
       setError(error.message);
       return;
     }
-
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
-    );
+    setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: newStatus } : o)));
+    fetchData(); // resync KPI & in case status filter sekarang exclude row ini
   };
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="p-6">
-
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold">Sales Orders</h1>
-        <Link
-          href="/salesorders/add"
-          className="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition"
-        >
+        <Link href="/salesorders/add" className="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">
           + Add Sales Order
         </Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Total SO</p>
-          <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
+          <p className="text-2xl font-bold text-gray-800">{summary?.total_orders ?? 0}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Total Value</p>
-          <p className="text-xl font-bold text-gray-800">
-            {formatMoney(totalValue)}
-          </p>
+          <p className="text-xl font-bold text-gray-800">{formatMoney(summary?.total_value ?? 0)}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Franco</p>
-          <p className="text-xl font-bold text-green-700">{francoCount} SO</p>
-          <p className="text-xs text-gray-500">{formatMoney(francoValue)}</p>
+          <p className="text-xl font-bold text-green-700">{summary?.franco_count ?? 0} SO</p>
+          <p className="text-xs text-gray-500">{formatMoney(summary?.franco_value ?? 0)}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Locco</p>
-          <p className="text-xl font-bold text-orange-700">{loccoCount} SO</p>
-          <p className="text-xs text-gray-500">{formatMoney(loccoValue)}</p>
+          <p className="text-xl font-bold text-orange-700">{summary?.locco_count ?? 0} SO</p>
+          <p className="text-xs text-gray-500">{formatMoney(summary?.locco_value ?? 0)}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Pending</p>
-          <p className="text-2xl font-bold text-gray-700">{pendingCount}</p>
+          <p className="text-2xl font-bold text-gray-700">{summary?.pending_count ?? 0}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">In Delivery</p>
-          <p className="text-2xl font-bold text-yellow-700">{inDeliveryCount}</p>
+          <p className="text-2xl font-bold text-yellow-700">{summary?.in_delivery_count ?? 0}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
           <p className="text-xs text-gray-500 uppercase font-semibold">Completed</p>
-          <p className="text-2xl font-bold text-green-700">{completedCount}</p>
+          <p className="text-2xl font-bold text-green-700">{summary?.completed_count ?? 0}</p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
           <p className="text-xs text-gray-500 uppercase font-semibold">Cancelled</p>
-          <p className="text-2xl font-bold text-red-700">{cancelledCount}</p>
+          <p className="text-2xl font-bold text-red-700">{summary?.cancelled_count ?? 0}</p>
         </div>
-
       </div>
 
-      {/* FILTERS */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
         <input
           type="text"
           placeholder="Filter Nama Supplier"
-          value={filters.customer_name}
-          onChange={(e) => setFilters({ ...filters, customer_name: e.target.value })}
+          value={textFilters.customer_name}
+          onChange={(e) => setTextFilters(prev => ({ ...prev, customer_name: e.target.value }))}
           className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
-
         <input
           type="text"
           placeholder="Filter No SO"
-          value={filters.so_number}
-          onChange={(e) => setFilters({ ...filters, so_number: e.target.value })}
+          value={textFilters.so_number}
+          onChange={(e) => setTextFilters(prev => ({ ...prev, so_number: e.target.value }))}
           className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
-
         <input
           type="text"
           placeholder="Filter No SJ"
-          value={filters.sj_number}
-          onChange={(e) => setFilters({ ...filters, sj_number: e.target.value })}
+          value={textFilters.sj_number}
+          onChange={(e) => setTextFilters(prev => ({ ...prev, sj_number: e.target.value }))}
           className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
-
         <input
           type="date"
-          value={filters.order_date}
-          onChange={(e) => setFilters({ ...filters, order_date: e.target.value })}
+          value={orderDate}
+          onChange={(e) => updateOrderDate(e.target.value)}
           className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
-
         <select
-          value={filters.status}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          value={status}
+          onChange={(e) => updateStatusFilter(e.target.value)}
           className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
           <option value="">All Status</option>
           {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s.replace('_', ' ')}
-            </option>
+            <option key={s} value={s}>{s.replace('_', ' ')}</option>
           ))}
         </select>
-
       </div>
 
-      {/* INFO STATE */}
+      <div className="text-sm text-gray-500 mb-2">
+        Menampilkan {orders.length} dari {total} hasil
+      </div>
+
       {loading && <div className="mb-2 text-gray-500">Loading...</div>}
       {error && <div className="mb-2 text-red-500">{error}</div>}
 
-      {/* TABLE */}
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white shadow rounded-lg overflow-hidden">
           <thead className="bg-gray-100 text-gray-700 uppercase text-sm">
@@ -359,32 +303,24 @@ export default function SalesOrdersPage() {
                   className={`p-3 cursor-pointer select-none ${col.align === 'right' ? 'text-right' : 'text-left'}`}
                   onClick={() => requestSort(col.key)}
                 >
-                  <span className="inline-flex items-center">
-                    {col.label}
-                    {getSortIcon(col.key)}
-                  </span>
+                  <span className="inline-flex items-center">{col.label}{getSortIcon(col.key)}</span>
                 </th>
               ))}
               <th className="p-3">Action</th>
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.length === 0 && !loading ? (
+            {orders.length === 0 && !loading ? (
               <tr>
-                <td colSpan={13} className="p-5 text-center text-gray-400">
-                  Belum ada sales order
-                </td>
+                <td colSpan={13} className="p-5 text-center text-gray-400">Belum ada sales order</td>
               </tr>
             ) : (
-              filteredOrders.map((o, index) => (
-                // ✅ FIX: Pakai kombinasi id + index sebagai key untuk pastikan selalu unik
+              orders.map((o, index) => (
                 <tr
-                  key={`${o.id}-${index}`}
-                  className={`border-b transition
-                    ${ROW_STATUS_CLASS[o.status ?? ""] ?? "bg-white hover:bg-gray-50"}
-                  `}
+                  key={o.id}
+                  className={`border-b transition ${ROW_STATUS_CLASS[o.status ?? ""] ?? "bg-white hover:bg-gray-50"}`}
                 >
-                  <td className="p-3 text-gray-600 font-medium">{index + 1}</td>
+                  <td className="p-3 text-gray-600 font-medium">{(page - 1) * PAGE_SIZE + index + 1}</td>
                   <td className="p-3">{o.order_date ? new Date(o.order_date).toLocaleDateString('id-ID') : '-'}</td>
                   <td className="p-3 font-medium">{o.so_number ?? '-'}</td>
                   <td className="p-3">{o.sj_numbers ?? '-'}</td>
@@ -394,34 +330,34 @@ export default function SalesOrdersPage() {
                   <td className="p-3 text-right">{o.total_pcs?.toLocaleString() ?? 0}</td>
                   <td className="p-3">{o.uk ?? '-'}</td>
                   <td className="p-3 text-right">{o.total_price?.toLocaleString('id-ID') ?? 0}</td>
-                  <td className="p-3 text-center">
-                    <PurchaseBadge type={o.purchase_type} />
-                  </td>
+                  <td className="p-3 text-center"><PurchaseBadge type={o.purchase_type} /></td>
                   <td className="p-3">
                     <select
                       value={o.status ?? ''}
                       onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                      className={`px-2 py-1 rounded border text-sm font-semibold
-                        ${o.status ? ROW_STATUS_CLASS[o.status] : 'bg-gray-100 text-gray-800'}
-                      `}
+                      className={`px-2 py-1 rounded border text-sm font-semibold ${o.status ? ROW_STATUS_CLASS[o.status] : 'bg-gray-100 text-gray-800'}`}
                     >
                       {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s.replace('_', ' ')}
-                        </option>
+                        <option key={s} value={s}>{s.replace('_', ' ')}</option>
                       ))}
                     </select>
                   </td>
                   <td className="p-3">
-                    <Link href={`/salesorders/${o.id}`} className="text-blue-600 hover:underline">
-                      See Details
-                    </Link>
+                    <Link href={`/salesorders/${o.id}`} className="text-blue-600 hover:underline">See Details</Link>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between mt-4">
+        <span className="text-sm text-gray-500">Halaman {page} dari {totalPages}</span>
+        <div className="flex gap-1">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded bg-gray-100 disabled:text-gray-300">‹ Prev</button>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-3 py-1 rounded bg-gray-100 disabled:text-gray-300">Next ›</button>
+        </div>
       </div>
     </div>
   );
