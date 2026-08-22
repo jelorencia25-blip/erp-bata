@@ -268,7 +268,7 @@ export async function PUT(
             return_reason: data?.reason ?? "",
           };
         })
-        .filter(Boolean);
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
       if (returnPayload.length > 0) {
         const { error: insertError } = await supabase

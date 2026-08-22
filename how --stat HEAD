@@ -1,6 +1,10 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
-import './globals.css';
+
+// ... rest of your existing code stays the same
+
+
+// import './globals.css';
 
 export default function RootLayout({
   children,
@@ -13,4 +17,3 @@ export default function RootLayout({
     </html>
   );
 }
-
