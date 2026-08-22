@@ -1,8 +1,11 @@
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
+declare module '*.css' {
+  const content: { [className: string]: string };
+  export default content;
+}
 
 // ... rest of your existing code stays the same
-
 
 import './globals.css';
 

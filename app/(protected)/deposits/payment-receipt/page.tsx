@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 type BankAccount = {
@@ -30,7 +30,11 @@ export default function DepositPaymentReceiptPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  const [isLunas, setIsLunas] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<DepositPaymentReceipt>({
     deposit_id: depositId || '',
@@ -61,7 +65,6 @@ export default function DepositPaymentReceiptPage() {
         const deposit = depositData.deposit;
         const payments = depositData.payments || [];
 
-        // ✅ Fix: jumlahkan SEMUA payments, bukan cuma yang pertama
         const totalPaymentAmount = payments.reduce(
           (sum: number, p: any) => sum + (p.amount || 0),
           0
@@ -78,7 +81,7 @@ export default function DepositPaymentReceiptPage() {
           deposit_code: deposit.deposit_code,
           supplier_name: deposit.customer_name,
           notes: depositDescription,
-          amount: totalPaymentAmount, // ✅ total semua payments
+          amount: totalPaymentAmount,
         }));
 
         setBankAccounts(bankData);
@@ -138,6 +141,56 @@ export default function DepositPaymentReceiptPage() {
     window.print();
   };
 
+  // Real PDF generation — no print dialog, no page-splitting.
+  // Uses html2canvas-pro (not the original html2canvas) because
+  // Tailwind v4 emits oklch() colors, which the original library
+  // cannot parse and throws on.
+  const handleDownloadPdf = async () => {
+    if (!receiptRef.current) return;
+    setGeneratingPdf(true);
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas-pro'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+
+      const marginMm = 6;
+      const contentWidthMm = 136; // matches the print layout's content width
+      const contentHeightMm = (canvas.height * contentWidthMm) / canvas.width;
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [contentWidthMm + marginMm * 2, contentHeightMm + marginMm * 2],
+      });
+
+      pdf.addImage(
+        imgData,
+        'PNG',
+        marginMm,
+        marginMm,
+        contentWidthMm,
+        contentHeightMm
+      );
+
+      const filename = `tanda-terima-${formData.deposit_code || 'pembayaran'}.pdf`;
+      pdf.save(filename);
+    } catch (err: any) {
+      console.error('PDF generation error:', err);
+      alert(`Gagal membuat PDF: ${err?.message ?? 'Unknown error'}`);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-10 text-center">
@@ -159,26 +212,47 @@ export default function DepositPaymentReceiptPage() {
         >
           ← Kembali
         </button>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-          >
-            {saving ? 'Menyimpan...' : '💾 Simpan'}
-          </button>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            🖨️ Print
-          </button>
+
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isLunas}
+              onChange={(e) => setIsLunas(e.target.checked)}
+              className="w-4 h-4"
+            />
+            Tandai LUNAS
+          </label>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              {saving ? 'Menyimpan...' : '💾 Simpan'}
+            </button>
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              🖨️ Print
+            </button>
+            {/* <button
+              onClick={handleDownloadPdf}
+              disabled={generatingPdf}
+              className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:opacity-50"
+            >
+              {generatingPdf ? 'Membuat PDF...' : '📄 Download PDF'}
+            </button> */}
+          </div>
         </div>
       </div>
 
       {/* RECEIPT */}
       <div
         id="receipt-content"
+        ref={receiptRef}
         className="max-w-4xl mx-auto bg-white shadow-lg"
         style={{ fontFamily: 'Arial, sans-serif' }}
       >
@@ -343,9 +417,23 @@ export default function DepositPaymentReceiptPage() {
 
               {/* ROW 11: Signatures */}
               <tr>
-                <td colSpan={3} className="border border-black p-2 text-center align-top">
+                <td
+                  colSpan={3}
+                  className="border border-black p-2 text-center align-top"
+                  style={{ position: 'relative', overflow: 'hidden', height: '110px' }}
+                >
                   <div className="mb-12 text-sm">Diserahkan oleh,</div>
                   <div className="border-t border-black inline-block px-10 text-xs"></div>
+
+                  {isLunas && (
+                    <div className="lunas-stamp">
+                      <div className="lunas-stamp-box">
+                        <span className="lunas-stamp-word">LUNAS</span>
+                        <div className="lunas-stamp-line" />
+                        <span className="lunas-stamp-sub">TERIMA KASIH</span>
+                      </div>
+                    </div>
+                  )}
                 </td>
                 <td colSpan={3} className="border border-black p-2 text-center align-top">
                   <div className="mb-12 text-sm">Diterima oleh,</div>
@@ -357,8 +445,45 @@ export default function DepositPaymentReceiptPage() {
         </div>
       </div>
 
-      {/* PRINT STYLES */}
+      {/* STAMP STYLES */}
       <style jsx global>{`
+        .lunas-stamp {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-8deg);
+          pointer-events: none;
+          z-index: 10;
+        }
+        .lunas-stamp-box {
+          border: 2.5px solid #c81e1e;
+          padding: 5px 16px 7px;
+          display: inline-flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .lunas-stamp-word {
+          color: #c81e1e;
+          font-weight: 900;
+          font-size: 24px;
+          letter-spacing: 3px;
+          line-height: 1.1;
+          white-space: nowrap;
+        }
+        .lunas-stamp-line {
+          width: 100%;
+          height: 1.5px;
+          background-color: #c81e1e;
+          margin: 3px 0;
+        }
+        .lunas-stamp-sub {
+          color: #c81e1e;
+          font-weight: 700;
+          font-size: 9px;
+          letter-spacing: 1.5px;
+          white-space: nowrap;
+        }
+
         @media print {
           @page {
             size: A5 portrait;
@@ -458,6 +583,26 @@ export default function DepositPaymentReceiptPage() {
           .font-semibold { font-weight: 600 !important; }
           .font-extrabold { font-weight: 900 !important; }
           .italic { font-style: italic !important; }
+
+          /* Stamp: only color TEXT and BORDER red — never give the
+             word/sub spans a red background, or the text disappears
+             into a solid red block (that was the earlier bug). */
+          .lunas-stamp-word,
+          .lunas-stamp-sub {
+            color: #c81e1e !important;
+            background-color: transparent !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .lunas-stamp-box {
+            border-color: #c81e1e !important;
+            background-color: transparent !important;
+          }
+          .lunas-stamp-line {
+            background-color: #c81e1e !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `}</style>
     </div>

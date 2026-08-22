@@ -27,6 +27,22 @@ type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 100;
 
+type Filters = {
+  sj: string;
+  so: string;
+  gudang: string;
+  supplier: string;
+  kepada: string;
+  supir: string;
+  plat: string;
+  dateFrom: string;
+  dateTo: string;
+};
+
+const EMPTY_FILTERS: Filters = {
+  sj: "", so: "", gudang: "", supplier: "", kepada: "", supir: "", plat: "", dateFrom: "", dateTo: "",
+};
+
 export default function DeliveriesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,11 +50,10 @@ export default function DeliveriesPage() {
   const tabParam = searchParams.get("tab") as "pending" | "processed" | null;
   const [tab, setTab] = useState<"pending" | "processed">(tabParam ?? "processed");
 
-  // ===== PENDING TAB: client-side fetch-all + filter (unchanged) =====
+  // ===== PENDING TAB: client-side fetch-all + filter =====
   const [pendingData, setPendingData] = useState<Row[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
-  const [pendingSearch, setPendingSearch] = useState("");
-  const [pendingFilterSO, setPendingFilterSO] = useState("");
+  const [pendingFilters, setPendingFilters] = useState<Filters>(EMPTY_FILTERS);
   const [pendingSortKey, setPendingSortKey] = useState<SortKey>("so_number");
   const [pendingSortDir, setPendingSortDir] = useState<SortDir>("desc");
 
@@ -56,15 +71,19 @@ export default function DeliveriesPage() {
   }, []);
 
   const pendingFilteredSorted = useMemo(() => {
-    const kw = pendingSearch.toLowerCase();
-    let filtered = pendingData.filter(row =>
-      (row.sj_number?.toLowerCase().includes(kw) ||
-        row.pelanggan?.toLowerCase().includes(kw) ||
-        row.kepada?.toLowerCase().includes(kw) ||
-        row.supir?.toLowerCase().includes(kw) ||
-        row.plat_mobil?.toLowerCase().includes(kw)) &&
-      (pendingFilterSO === "" || row.so_number?.toLowerCase().includes(pendingFilterSO.toLowerCase()))
-    );
+    const f = pendingFilters;
+    let filtered = pendingData.filter(row => {
+      if (f.sj && !row.sj_number?.toLowerCase().includes(f.sj.toLowerCase())) return false;
+      if (f.so && !row.so_number?.toLowerCase().includes(f.so.toLowerCase())) return false;
+      if (f.gudang && !row.no_gudang?.toLowerCase().includes(f.gudang.toLowerCase())) return false;
+      if (f.supplier && !row.pelanggan?.toLowerCase().includes(f.supplier.toLowerCase())) return false;
+      if (f.kepada && !row.kepada?.toLowerCase().includes(f.kepada.toLowerCase())) return false;
+      if (f.supir && !row.supir?.toLowerCase().includes(f.supir.toLowerCase())) return false;
+      if (f.plat && !row.plat_mobil?.toLowerCase().includes(f.plat.toLowerCase())) return false;
+      if (f.dateFrom && row.delivery_date && row.delivery_date < f.dateFrom) return false;
+      if (f.dateTo && row.delivery_date && row.delivery_date > f.dateTo) return false;
+      return true;
+    });
 
     filtered = [...filtered].sort((a: any, b: any) => {
       const aVal = a[pendingSortKey], bVal = b[pendingSortKey];
@@ -79,7 +98,7 @@ export default function DeliveriesPage() {
     });
 
     return filtered;
-  }, [pendingData, pendingSearch, pendingFilterSO, pendingSortKey, pendingSortDir]);
+  }, [pendingData, pendingFilters, pendingSortKey, pendingSortDir]);
 
   // ===== PROCESSED TAB: server-side paginated + filtered =====
   const [rows, setRows] = useState<Row[]>([]);
@@ -87,26 +106,20 @@ export default function DeliveriesPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filterSO, setFilterSO] = useState("");
-  const [debouncedFilterSO, setDebouncedFilterSO] = useState("");
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [debouncedFilters, setDebouncedFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filterAction, setFilterAction] = useState<"all" | "done" | "final">("all");
   const [sortKey, setSortKey] = useState<SortKey>("delivery_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [showFilters, setShowFilters] = useState(true);
 
   const [confirmRow, setConfirmRow] = useState<Row | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    const t = setTimeout(() => setDebouncedFilters(filters), 300);
     return () => clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedFilterSO(filterSO), 300);
-    return () => clearTimeout(t);
-  }, [filterSO]);
+  }, [filters]);
 
   const fetchProcessed = useCallback(async () => {
     setLoading(true);
@@ -117,8 +130,16 @@ export default function DeliveriesPage() {
         sortBy: sortKey,
         sortDir,
       });
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (debouncedFilterSO) params.set("so", debouncedFilterSO);
+      const f = debouncedFilters;
+      if (f.sj) params.set("sj", f.sj);
+      if (f.so) params.set("so", f.so);
+      if (f.gudang) params.set("gudang", f.gudang);
+      if (f.supplier) params.set("supplier", f.supplier);
+      if (f.kepada) params.set("kepada", f.kepada);
+      if (f.supir) params.set("supir", f.supir);
+      if (f.plat) params.set("plat", f.plat);
+      if (f.dateFrom) params.set("dateFrom", f.dateFrom);
+      if (f.dateTo) params.set("dateTo", f.dateTo);
       if (filterAction !== "all") params.set("action", filterAction);
 
       const res = await fetch(`/api/deliveries/processed?${params.toString()}`);
@@ -130,18 +151,16 @@ export default function DeliveriesPage() {
       setTotal(0);
     }
     setLoading(false);
-  }, [page, sortKey, sortDir, debouncedSearch, debouncedFilterSO, filterAction]);
+  }, [page, sortKey, sortDir, debouncedFilters, filterAction]);
 
-  // tab switch: handle URL + pending fetch
   useEffect(() => {
     router.replace(`/deliveries?tab=${tab}`);
     if (tab === "pending") fetchPending();
   }, [tab]);
 
-  // single source of truth for processed tab fetching
   useEffect(() => {
     if (tab === "processed") fetchProcessed();
-  }, [tab, page, sortKey, sortDir, debouncedSearch, debouncedFilterSO, filterAction]);
+  }, [tab, page, sortKey, sortDir, debouncedFilters, filterAction]);
 
   const toggleSort = (key: SortKey, isPending: boolean) => {
     if (isPending) {
@@ -167,6 +186,19 @@ export default function DeliveriesPage() {
   const displayRows = tab === "pending" ? pendingFilteredSorted : rows;
   const isLoading = tab === "pending" ? pendingLoading : loading;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const activeFilters = tab === "pending" ? pendingFilters : filters;
+  const setActiveFilters = tab === "pending" ? setPendingFilters : (f: Filters) => { setFilters(f); setPage(1); };
+
+  const updateFilter = (key: keyof Filters, value: string) => {
+    setActiveFilters({ ...activeFilters, [key]: value });
+  };
+
+  const clearFilters = () => {
+    setActiveFilters(EMPTY_FILTERS);
+  };
+
+  const activeFilterCount = Object.values(activeFilters).filter(v => v !== "").length;
 
   return (
     <div className="p-6">
@@ -196,35 +228,86 @@ export default function DeliveriesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <input
-          value={tab === "pending" ? pendingSearch : search}
-          onChange={e => {
-            if (tab === "pending") setPendingSearch(e.target.value);
-            else { setSearch(e.target.value); setPage(1); }
-          }}
-          placeholder="Cari No SJ, Supplier, Kepada, Supir, Plat..."
-          className="border rounded px-3 py-2 text-sm"
-        />
-        <input
-          value={tab === "pending" ? pendingFilterSO : filterSO}
-          onChange={e => {
-            if (tab === "pending") setPendingFilterSO(e.target.value);
-            else { setFilterSO(e.target.value); setPage(1); }
-          }}
-          placeholder="Filter No SO..."
-          className="border rounded px-3 py-2 text-sm"
-        />
-        {tab === "processed" && (
-          <select
-            value={filterAction}
-            onChange={e => { setFilterAction(e.target.value as any); setPage(1); }}
-            className="border rounded px-3 py-2 text-sm"
+      {/* ===== FILTER BAR ===== */}
+      <div className="bg-white rounded shadow p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="text-sm font-medium text-blue-600"
           >
-            <option value="all">Semua Status</option>
-            <option value="done">DONE (Belum Final)</option>
-            <option value="final">FINAL</option>
-          </select>
+            {showFilters ? "▼" : "▶"} Filter {activeFilterCount > 0 && `(${activeFilterCount} aktif)`}
+          </button>
+          {activeFilterCount > 0 && (
+            <button onClick={clearFilters} className="text-xs text-red-500 hover:underline">
+              Reset semua filter
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">No SJ</label>
+              <input value={activeFilters.sj} onChange={e => updateFilter("sj", e.target.value)}
+                placeholder="Cari No SJ..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">No SO</label>
+              <input value={activeFilters.so} onChange={e => updateFilter("so", e.target.value)}
+                placeholder="Cari No SO..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">No Gudang</label>
+              <input value={activeFilters.gudang} onChange={e => updateFilter("gudang", e.target.value)}
+                placeholder="Cari No Gudang..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Supplier</label>
+              <input value={activeFilters.supplier} onChange={e => updateFilter("supplier", e.target.value)}
+                placeholder="Cari Supplier..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Kepada</label>
+              <input value={activeFilters.kepada} onChange={e => updateFilter("kepada", e.target.value)}
+                placeholder="Cari Kepada..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Supir</label>
+              <input value={activeFilters.supir} onChange={e => updateFilter("supir", e.target.value)}
+                placeholder="Cari Supir..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Plat</label>
+              <input value={activeFilters.plat} onChange={e => updateFilter("plat", e.target.value)}
+                placeholder="Cari Plat..." className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Status</label>
+              {tab === "processed" ? (
+                <select
+                  value={filterAction}
+                  onChange={e => { setFilterAction(e.target.value as any); setPage(1); }}
+                  className="border rounded px-3 py-2 text-sm w-full"
+                >
+                  <option value="all">Semua Status</option>
+                  <option value="done">DONE (Belum Final)</option>
+                  <option value="final">FINAL</option>
+                </select>
+              ) : (
+                <div className="text-xs text-gray-400 py-2">-</div>
+              )}
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Tgl Delivery Dari</label>
+              <input type="date" value={activeFilters.dateFrom} onChange={e => updateFilter("dateFrom", e.target.value)}
+                className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Tgl Delivery Sampai</label>
+              <input type="date" value={activeFilters.dateTo} onChange={e => updateFilter("dateTo", e.target.value)}
+                className="border rounded px-3 py-2 text-sm w-full" />
+            </div>
+          </div>
         )}
       </div>
 

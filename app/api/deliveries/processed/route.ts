@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const ALLOWED_SORT_COLUMNS = new Set([
-  'delivery_date', 'no_gudang' , 'sj_number', 'so_number', 'pelanggan', 'kepada',
+  'delivery_date', 'no_gudang', 'sj_number', 'so_number', 'pelanggan', 'kepada',
   'ukuran', 'total_pcs', 'palet', 'total_m3', 'return_pcs', 'supir', 'plat_mobil'
 ]);
 
@@ -19,8 +19,18 @@ export async function GET(request: Request) {
 
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
     const pageSize = Math.min(500, Math.max(1, parseInt(searchParams.get('pageSize') ?? '100', 10)));
-    const search = searchParams.get('search')?.trim() ?? '';
+
+    // Per-field filters — each is independent (AND), no more single OR-search box
+    const filterSJ = searchParams.get('sj')?.trim() ?? '';
     const filterSO = searchParams.get('so')?.trim() ?? '';
+    const filterGudang = searchParams.get('gudang')?.trim() ?? '';
+    const filterSupplier = searchParams.get('supplier')?.trim() ?? ''; // maps to `pelanggan` column
+    const filterKepada = searchParams.get('kepada')?.trim() ?? '';
+    const filterSupir = searchParams.get('supir')?.trim() ?? '';
+    const filterPlat = searchParams.get('plat')?.trim() ?? '';
+    const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
+    const dateTo = searchParams.get('dateTo')?.trim() ?? '';
+
     const filterAction = searchParams.get('action') ?? 'all'; // all | done | final
     const sortByRaw = searchParams.get('sortBy') ?? 'delivery_date';
     const sortBy = ALLOWED_SORT_COLUMNS.has(sortByRaw) ? sortByRaw : 'delivery_date';
@@ -33,16 +43,16 @@ export async function GET(request: Request) {
       .from('v_deliveries_processed_list')
       .select('*', { count: 'exact' });
 
-    if (search) {
-      const kw = `%${search}%`;
-      query = query.or(
-        `sj_number.ilike.${kw},pelanggan.ilike.${kw},kepada.ilike.${kw},supir.ilike.${kw},plat_mobil.ilike.${kw}`
-      );
-    }
+    if (filterSJ) query = query.ilike('sj_number', `%${filterSJ}%`);
+    if (filterSO) query = query.ilike('so_number', `%${filterSO}%`);
+    if (filterGudang) query = query.ilike('no_gudang', `%${filterGudang}%`);
+    if (filterSupplier) query = query.ilike('pelanggan', `%${filterSupplier}%`);
+    if (filterKepada) query = query.ilike('kepada', `%${filterKepada}%`);
+    if (filterSupir) query = query.ilike('supir', `%${filterSupir}%`);
+    if (filterPlat) query = query.ilike('plat_mobil', `%${filterPlat}%`);
 
-    if (filterSO) {
-      query = query.ilike('so_number', `%${filterSO}%`);
-    }
+    if (dateFrom) query = query.gte('delivery_date', dateFrom);
+    if (dateTo) query = query.lte('delivery_date', dateTo);
 
     if (filterAction === 'done') {
       query = query.eq('final_status', 'draft');
