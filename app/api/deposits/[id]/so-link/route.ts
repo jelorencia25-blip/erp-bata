@@ -65,9 +65,20 @@ export async function POST(
         amount_used: 0,
       });
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      // Kode 23505 = unique constraint violation di kolom sales_order_id.
+      // Terjadi kalau ada insert lain (misal manual dari Supabase table editor)
+      // yang nabrak SO yang sama di antara waktu cek existingUsage di atas
+      // dan insert ini. Database sendiri yang menolak, bukan cuma validasi kode.
+      if (insertError.code === '23505') {
+        return NextResponse.json(
+          { error: 'SO ini sudah terhubung ke deposit lain' },
+          { status: 400 }
+        );
+      }
+      throw insertError;
+    }
 
-    // Return fresh deposit detail
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('LINK SO ERROR:', err);
@@ -86,8 +97,7 @@ export async function DELETE(
 
   try {
     const { id: depositId } = await context.params;
-    
-    // ✅ Fix: handle body yang mungkin kosong
+
     let sales_order_id: string | null = null;
     try {
       const body = await request.json();
@@ -96,7 +106,6 @@ export async function DELETE(
       // body kosong atau invalid JSON
     }
 
-    // Fallback: coba dari query param
     if (!sales_order_id) {
       const { searchParams } = new URL(request.url);
       sales_order_id = searchParams.get('sales_order_id');
@@ -106,15 +115,29 @@ export async function DELETE(
       return NextResponse.json({ error: 'sales_order_id required' }, { status: 400 });
     }
 
-    const { error: deleteError } = await supabase
+    // PENTING: hapus SEMUA row deposit_usages untuk SO ini, di deposit manapun
+    // ia nyangkut — TIDAK di-filter by depositId. Ini memastikan klik "Hapus"
+    // benar-benar melepas SO tersebut secara total (jadi null / bebas dari
+    // deposit manapun), bukan cuma dari deposit yang modal-nya lagi kebuka.
+    // depositId tetap diambil dari params untuk konsistensi struktur route,
+    // tapi sengaja tidak dipakai sebagai filter di query delete ini.
+    const { data: deletedRows, error: deleteError } = await supabase
       .from('deposit_usages')
       .delete()
-      .eq('deposit_id', depositId)
-      .eq('sales_order_id', sales_order_id);
+      .eq('sales_order_id', sales_order_id)
+      .select('id, deposit_id');
 
     if (deleteError) throw deleteError;
 
-    return NextResponse.json({ success: true });
+    console.log(
+      `UNLINK SO ${sales_order_id}: removed ${deletedRows?.length ?? 0} row(s) across deposits`,
+      deletedRows?.map((r) => r.deposit_id)
+    );
+
+    return NextResponse.json({
+      success: true,
+      removed_count: deletedRows?.length ?? 0,
+    });
   } catch (err: any) {
     console.error('UNLINK SO ERROR:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

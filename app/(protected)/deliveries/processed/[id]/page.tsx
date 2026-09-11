@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import autoTable from "jspdf-autotable";
 
 type Vehicle = { id: string; plate_number: string };
 type Staff = { id: string; name: string };
@@ -123,94 +123,200 @@ export default function DeliveryProcessedDetailPage() {
     loadData();
   }, [id]);
 
-  const stripUnsupportedColors = (el: HTMLElement) => {
-    const all = el.querySelectorAll("*");
-
-    all.forEach((node) => {
-      const style = window.getComputedStyle(node);
-
-      [
-        "color",
-        "backgroundColor",
-        "borderColor",
-        "borderTopColor",
-        "borderRightColor", 
-        "borderBottomColor",
-        "borderLeftColor",
-      ].forEach((prop) => {
-        const value = style[prop as any];
-        if (value?.includes("lab(") || value?.includes("oklab(") || value?.includes("lch(")) {
-          (node as HTMLElement).style[prop as any] = "#000";
-        }
-      });
-    });
-  };
-
-  const handleDownloadPdf = async () => {
-    const element = document.getElementById("print-content");
-    if (!element) {
-      alert("Element tidak ditemukan");
+  const handleDownloadPdf = () => {
+    if (!data) {
+      alert("Data belum siap");
       return;
     }
 
-    const clone = element.cloneNode(true) as HTMLElement;
-    
-    clone.querySelectorAll('.print\\:hidden').forEach(el => {
-      (el as HTMLElement).style.display = 'none';
+    const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const marginX = 10;
+    const pageWidth = 210;
+    const contentWidth = pageWidth - marginX * 2;
+    let y = 15;
+
+    doc.setTextColor(0, 0, 0);
+
+    // ===== TITLE =====
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    const title = `Surat Jalan - ${data.sj_number} - GUDANG BEKASI`;
+    doc.text(title, pageWidth / 2, y, { align: "center" });
+    y += 3;
+    doc.setLineWidth(0.6);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 7;
+
+    // ===== INFO GRID (2 columns) =====
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+
+    const leftCol: [string, string][] = [
+      ["Nomor SO", data.so_number || "-"],
+      ["Supplier", data.customer_name || "-"],
+      ["Purchase Type", data.purchase_type || "-"],
+      ["Telp", data.contact_phone || "-"],
+    ];
+    const rightCol: [string, string][] = [
+      ["Tanggal SO", data.order_date || "-"],
+      ["No Ref", data.customer_order_ref || "-"],
+      ["Kepada", data.ship_to_name || "-"],
+      ["Catatan", data.notes || "-"],
+    ];
+
+    const colGap = 6;
+    const halfWidth = (contentWidth - colGap) / 2;
+    const labelWidth = 32;
+    const rowHeight = 6;
+    const gridStartY = y;
+
+    leftCol.forEach(([label, value], i) => {
+      const rowY = gridStartY + i * rowHeight;
+      doc.text(label, marginX, rowY);
+      doc.text(value, marginX + labelWidth, rowY);
+      doc.setLineWidth(0.3);
+      doc.line(marginX, rowY + 2, marginX + halfWidth, rowY + 2);
     });
-    clone.querySelectorAll('.hidden.print\\:inline').forEach(el => {
-      (el as HTMLElement).style.display = 'inline';
+
+    rightCol.forEach(([label, value], i) => {
+      const rowY = gridStartY + i * rowHeight;
+      const colX = marginX + halfWidth + colGap;
+      doc.text(label, colX, rowY);
+      doc.text(value, colX + labelWidth, rowY);
+      doc.setLineWidth(0.3);
+      doc.line(colX, rowY + 2, colX + halfWidth, rowY + 2);
     });
-    clone.querySelectorAll('.hidden.print\\:block').forEach(el => {
-      (el as HTMLElement).style.display = 'block';
+
+    y = gridStartY + leftCol.length * rowHeight + 4;
+
+    // ===== ALAMAT =====
+    doc.text("Alamat", marginX, y);
+    doc.text(data.delivery_address || "-", marginX + labelWidth, y);
+    doc.setLineWidth(0.3);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 8;
+
+    // ===== ITEMS TABLE =====
+    autoTable(doc, {
+      startY: y,
+      margin: { left: marginX, right: marginX },
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontStyle: "bold",
+        fontSize: 10,
+        halign: "center",
+        valign: "middle",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+        textColor: [0, 0, 0],
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+      },
+      head: [["No", "Barang / Ukuran", "Isi / Palet", "M3", "Palet", "PCS"]],
+      body: data.delivery_items.map((item, idx) => [
+        String(idx + 1),
+        `${item.product_name}${item.product_size ? ` (${item.product_size})` : ""}`,
+        item.isi_per_palet ? String(item.isi_per_palet) : "-",
+        `${item.kubik_m3} m3`,
+        String(item.pallet_qty),
+        String(item.total_pcs),
+      ]),
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { halign: "left", cellWidth: "auto" },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 16 },
+        5: { cellWidth: 20 },
+      },
     });
 
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.width = '210mm';
-    clone.style.padding = '10mm';
-    clone.style.backgroundColor = '#ffffff';
-    clone.style.fontFamily = 'Verdana, Geneva, Tahoma, sans-serif';
-    document.body.appendChild(clone);
+    // @ts-expect-error - lastAutoTable is attached by the plugin at runtime
+    y = doc.lastAutoTable.finalY + 6;
 
-    stripUnsupportedColors(clone);
+    // ===== RETUR TABLE =====
+    autoTable(doc, {
+      startY: y,
+      margin: { left: marginX, right: marginX },
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontStyle: "bold",
+        fontSize: 10,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+        textColor: [0, 0, 0],
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+      },
+      head: [["Retur Barang", "PCS"]],
+      body: data.delivery_items.map((item) => [
+        `${item.product_name}${item.product_size ? ` (${item.product_size})` : ""}`,
+        String(returns[item.id]?.qty ?? 0),
+      ]),
+      columnStyles: {
+        0: { halign: "left", cellWidth: "auto" },
+        1: { halign: "center", cellWidth: 24 },
+      },
+    });
 
-    try {
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        logging: false,
-        useCORS: true,
-      });
+    // @ts-expect-error - lastAutoTable is attached by the plugin at runtime
+    y = doc.lastAutoTable.finalY + 8;
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
+    // ===== NO GUDANG / SUPIR / PLAT (3 columns) =====
+    const thirdWidth = (contentWidth - colGap * 2) / 3;
+    const driverName = drivers.find((d) => d.id === driverId)?.name || "-";
+    const plateNumber = vehicles.find((v) => v.id === vehicleId)?.plate_number || "-";
 
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+    const threeCol: [string, string][] = [
+      ["No Gudang", noGudang || "-"],
+      ["Supir", driverName],
+      ["Plat Mobil", plateNumber],
+    ];
 
-      let heightLeft = imgHeight;
-      let position = 0;
+    doc.setFont("helvetica", "bold");
+    threeCol.forEach(([label], i) => {
+      const colX = marginX + i * (thirdWidth + colGap);
+      doc.text(label, colX, y);
+    });
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+    threeCol.forEach(([, value], i) => {
+      const colX = marginX + i * (thirdWidth + colGap);
+      doc.text(value, colX, y + 6);
+      doc.setLineWidth(0.3);
+      doc.line(colX, y + 8, colX + thirdWidth, y + 8);
+    });
 
-      while (heightLeft > 0) {
-        position -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
+    y += 20;
 
-      pdf.save(`Surat-Jalan-${data?.sj_number}.pdf`);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Gagal generate PDF");
-    } finally {
-      document.body.removeChild(clone);
-    }
+    // ===== SIGNATURE FOOTER (4 columns) =====
+    doc.setLineWidth(0.6);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 8;
+
+    const fourthWidth = contentWidth / 4;
+    const footerLabels = ["Tanda Terima", "Supir", "Dibuat Oleh", "Security"];
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    footerLabels.forEach((label, i) => {
+      const colX = marginX + i * fourthWidth;
+      const textWidth = doc.getTextWidth(label);
+      doc.text(label, colX + fourthWidth / 2 - textWidth / 2, y);
+    });
+
+    doc.save(`Surat-Jalan-${data.sj_number}.pdf`);
   };
 
   const handleSave = async () => {

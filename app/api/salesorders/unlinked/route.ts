@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'customer_id required' }, { status: 400 });
     }
 
-    // ✅ Fetch semua SO milik customer ini dulu
+    // Fetch semua SO milik customer ini dulu
     const { data: allSO, error: soError } = await supabase
       .from('sales_orders')
       .select('id, so_number, order_date, ship_to_name, status')
@@ -34,27 +34,25 @@ export async function GET(request: Request) {
       return NextResponse.json([]);
     }
 
-    // ✅ Ambil SO IDs milik customer ini saja
-    const soIds = allSO.map((so: any) => so.id);
-
-    // ✅ Cek mana yang sudah ada di deposit_usages — filter by soIds yg relevan saja
-    const { data: linkedSOIds, error: linkedError } = await supabase
+    // Ambil SEMUA sales_order_id yang sudah terpakai di deposit_usages —
+    // TANPA filter .in() by soIds. Query ini tidak terikat jumlah SO milik
+    // customer manapun, jadi tidak akan pernah kena limit panjang URL,
+    // berapa pun banyaknya SO yang dimiliki satu customer.
+    const { data: linkedRows, error: linkedError } = await supabase
       .from('deposit_usages')
       .select('sales_order_id')
-      .not('sales_order_id', 'is', null)
-      .in('sales_order_id', soIds); // ✅ hanya cek SO milik customer ini
+      .not('sales_order_id', 'is', null);
 
     if (linkedError) {
       console.error('Error fetching linked SO:', linkedError);
       return NextResponse.json({ error: linkedError.message }, { status: 500 });
     }
 
-    // ✅ Buat Set untuk lookup cepat
+    // Filter di aplikasi: buang SO yang sales_order_id-nya sudah ada di deposit_usages
     const usedIdSet = new Set(
-      (linkedSOIds || []).map((u: any) => u.sales_order_id).filter(Boolean)
+      (linkedRows || []).map((u: any) => u.sales_order_id).filter(Boolean)
     );
 
-    // ✅ Filter di aplikasi, bukan di Supabase query
     const unlinkedSO = allSO.filter((so: any) => !usedIdSet.has(so.id));
 
     return NextResponse.json(unlinkedSO);

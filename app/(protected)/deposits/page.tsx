@@ -117,7 +117,6 @@ export default function DepositsPage() {
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showAddSOModal, setShowAddSOModal] = useState(false);
 
-  // ✅ NEW: Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
     deposit_date: '',
@@ -134,6 +133,7 @@ export default function DepositsPage() {
   const [unlinkedSOs, setUnlinkedSOs] = useState<UnlinkedSO[]>([]);
   const [loadingUnlinked, setLoadingUnlinked] = useState(false);
   const [selectedSOId, setSelectedSOId] = useState('');
+  const [soSearchText, setSoSearchText] = useState('');
   const [linkLoading, setLinkLoading] = useState(false);
 
   const [filters, setFilters] = useState({ customer: '', status: '' });
@@ -276,7 +276,6 @@ export default function DepositsPage() {
     }
   };
 
-  // ✅ NEW: handleEdit
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDeposit) return;
@@ -343,7 +342,12 @@ export default function DepositsPage() {
 
   const handleUnlinkSO = async (soId: string) => {
     if (!selectedDeposit) return;
-    if (!confirm('Hapus SO ini dari deposit? DO remaining akan bertambah kembali.')) return;
+    if (
+      !confirm(
+        'SO ini akan dilepas dari SEMUA deposit (bukan cuma deposit ini), dan DO remaining di deposit terkait akan bertambah kembali. Lanjutkan?'
+      )
+    )
+      return;
     try {
       const res = await fetch(
         `/api/deposits/${selectedDeposit.deposit.id}/so-link?sales_order_id=${soId}`,
@@ -473,11 +477,8 @@ export default function DepositsPage() {
                   <td className="p-3 text-center">{d.so_count}</td>
                   <td className="p-3 text-center"><StatusBadge status={d.status} /></td>
 
-                  {/* ACTION — icon buttons horizontal */}
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-1">
-
-                      {/* Detail */}
                       <button
                         onClick={() => fetchDepositDetail(d.id)}
                         title="Detail"
@@ -486,7 +487,6 @@ export default function DepositsPage() {
                         <IconEye />
                       </button>
 
-                      {/* Top Up — hanya kalau active */}
                       {d.status === 'active' && (
                         <button
                           onClick={() => { fetchDepositDetail(d.id); setShowTopUpModal(true); }}
@@ -497,7 +497,6 @@ export default function DepositsPage() {
                         </button>
                       )}
 
-                      {/* Tanda Terima Pembayaran */}
                       <button
                         onClick={() => router.push(`/deposits/payment-receipt?deposit_id=${d.id}`)}
                         title="Tanda Terima Pembayaran"
@@ -506,7 +505,6 @@ export default function DepositsPage() {
                         <IconReceipt />
                       </button>
 
-                      {/* Tanda Terima Faktur */}
                       <button
                         onClick={() => router.push(`/deposits/faktur-terima?deposit_id=${d.id}`)}
                         title="Tanda Terima Faktur"
@@ -514,7 +512,6 @@ export default function DepositsPage() {
                       >
                         <IconFaktur />
                       </button>
-
                     </div>
                   </td>
                 </tr>
@@ -524,7 +521,6 @@ export default function DepositsPage() {
         </table>
       </div>
 
-      {/* CREATE MODAL */}
       {showCreateModal && !showConfirmationStep && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
@@ -585,7 +581,6 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* CONFIRMATION MODAL */}
       {showConfirmationStep && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -610,7 +605,6 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* DETAIL MODAL */}
       {showDetailModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
@@ -619,7 +613,6 @@ export default function DepositsPage() {
               <button onClick={() => setShowDetailModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
             </div>
 
-            {/* ✅ UPDATED: Info grid with Notes added */}
             <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded">
               <div><p className="text-sm text-gray-600">Supplier</p><p className="font-semibold">{selectedDeposit.deposit.customer_name}</p></div>
               <div><p className="text-sm text-gray-600">Status</p><StatusBadge status={selectedDeposit.deposit.status} /></div>
@@ -635,7 +628,6 @@ export default function DepositsPage() {
               <div><p className="text-sm text-gray-600">Deposit Amount</p><p className="font-semibold">Rp {selectedDeposit.deposit.deposit_amount.toLocaleString('id-ID')}</p></div>
               <div><p className="text-sm text-gray-600">Amount Used</p><p className="font-semibold text-orange-600">Rp {selectedDeposit.deposit.amount_used.toLocaleString('id-ID')}</p></div>
               <div><p className="text-sm text-gray-600">Amount Remaining</p><p className="font-semibold text-green-600">Rp {selectedDeposit.deposit.amount_remaining.toLocaleString('id-ID')}</p></div>
-              {/* ✅ NEW: Notes — full width, always shown */}
               <div className="col-span-2">
                 <p className="text-sm text-gray-600">Notes</p>
                 <p className="font-medium text-gray-800">
@@ -682,7 +674,11 @@ export default function DepositsPage() {
                 <h3 className="text-lg font-bold">Sales Order Usage</h3>
                 {selectedDeposit.deposit.status === 'active' && (
                   <button
-                    onClick={() => { setShowAddSOModal(true); fetchUnlinkedSOs(selectedDeposit.deposit.customer_id); }}
+                    onClick={() => {
+                      setShowAddSOModal(true);
+                      setSoSearchText('');
+                      fetchUnlinkedSOs(selectedDeposit.deposit.customer_id);
+                    }}
                     className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                   >
                     + Tambah SO
@@ -734,7 +730,6 @@ export default function DepositsPage() {
               )}
             </div>
 
-            {/* ✅ UPDATED: Footer with Edit button added */}
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => {
@@ -777,18 +772,46 @@ export default function DepositsPage() {
             ) : unlinkedSOs.length === 0 ? (
               <p className="text-gray-400 text-sm py-4 text-center">Tidak ada SO yang tersedia untuk ditambahkan.</p>
             ) : (
-              <select value={selectedSOId} onChange={(e) => setSelectedSOId(e.target.value)}
-                className="w-full border rounded px-3 py-2 mb-4">
-                <option value="">-- Pilih SO --</option>
-                {unlinkedSOs.map((so) => (
-                  <option key={so.id} value={so.id}>
-                    {so.so_number} — {so.ship_to_name || '-'} ({new Date(so.order_date).toLocaleDateString('id-ID')}) [{so.status}]
-                  </option>
-                ))}
-              </select>
+              <>
+                <input
+                  type="text"
+                  list="unlinked-so-options"
+                  placeholder="Ketik No SO atau nama tujuan (Kepada)..."
+                  value={
+                    selectedSOId
+                      ? (() => {
+                          const so = unlinkedSOs.find((s) => s.id === selectedSOId);
+                          return so
+                            ? `${so.so_number} — ${so.ship_to_name || '-'} (${new Date(so.order_date).toLocaleDateString('id-ID')}) [${so.status}]`
+                            : '';
+                        })()
+                      : soSearchText
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSoSearchText(val);
+
+                    const matched = unlinkedSOs.find((so) => {
+                      const label = `${so.so_number} — ${so.ship_to_name || '-'} (${new Date(so.order_date).toLocaleDateString('id-ID')}) [${so.status}]`;
+                      return label === val;
+                    });
+
+                    setSelectedSOId(matched ? matched.id : '');
+                  }}
+                  className="w-full border rounded px-3 py-2 mb-4"
+                />
+                <datalist id="unlinked-so-options">
+                  {unlinkedSOs.map((so) => (
+                    <option
+                      key={so.id}
+                      value={`${so.so_number} — ${so.ship_to_name || '-'} (${new Date(so.order_date).toLocaleDateString('id-ID')}) [${so.status}]`}
+                    />
+                  ))}
+                </datalist>
+              </>
             )}
             <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowAddSOModal(false); setSelectedSOId(''); }}
+              <button onClick={() => { setShowAddSOModal(false); setSelectedSOId(''); setSoSearchText(''); }}
                 className="px-4 py-2 border rounded hover:bg-gray-100">Batal</button>
               <button onClick={handleLinkSO} disabled={!selectedSOId || linkLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
@@ -799,7 +822,6 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* TOP UP MODAL */}
       {showTopUpModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -848,7 +870,6 @@ export default function DepositsPage() {
         </div>
       )}
 
-      {/* ✅ NEW: EDIT MODAL */}
       {showEditModal && selectedDeposit && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
