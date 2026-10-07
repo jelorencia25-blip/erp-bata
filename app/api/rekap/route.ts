@@ -3,6 +3,17 @@ export const dynamic = 'force-dynamic'
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+// Ambil angka pertama dari ukuran ("7,5" / "7.5" / "10") → bucket
+function sizeBucket(u: unknown): "10" | "7.5" | null {
+  if (u == null) return null;
+  const m = String(u).match(/\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0].replace(",", "."));
+  if (n === 10) return "10";
+  if (n === 7.5) return "7.5";
+  return null;
+}
+
 export async function GET(req: Request) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,19 +25,17 @@ export async function GET(req: Request) {
     const dateFrom = searchParams.get("date_from");
     const dateTo = searchParams.get("date_to");
 
-    console.log("🚀 Starting rekap fetch...");
-
     // =============================
     // 1. DELIVERY ORDERS - MANUAL PAGINATION
     // =============================
-    let allDeliveries: any[] = [];
+    const allDeliveries: any[] = [];
     let from = 0;
     const batch = 1000;
 
     while (true) {
       const { data, error } = await supabase
         .from("delivery_orders")
-        .select("id, sj_number, delivery_date, sales_order_id, final_status")
+        .select("id, sj_number, delivery_date, sales_order_id, final_status, no_gudang, customer_order_ref")
         .range(from, from + batch - 1)
         .order("id", { ascending: true });
 
@@ -38,144 +47,95 @@ export async function GET(req: Request) {
       from += batch;
     }
 
-    console.log(`✅ Total deliveries: ${allDeliveries.length}`);
-
-    // Filter final + date range
     let deliveries = allDeliveries.filter((d: any) => d.final_status === "final");
     if (dateFrom) deliveries = deliveries.filter((d: any) => d.delivery_date && d.delivery_date >= dateFrom);
     if (dateTo) deliveries = deliveries.filter((d: any) => d.delivery_date && d.delivery_date <= dateTo);
-
-    console.log(`✅ Final deliveries (after date filter): ${deliveries.length}`);
 
     if (deliveries.length === 0) return NextResponse.json([]);
 
     const doIds = deliveries.map((d: any) => d.id);
     const soIds = [...new Set(deliveries.map((d: any) => d.sales_order_id).filter(Boolean))] as string[];
+    const deliveryById = new Map(deliveries.map((d: any) => [String(d.id), d]));
 
-    console.log(`🔗 Unique SO IDs: ${soIds.length}`);
-
-    // =============================
-    // 2. SALES ORDERS - BATCH FETCH
-    // =============================
-    const salesOrders: any[] = [];
-    const soChunkSize = 100;
-
-    for (let i = 0; i < soIds.length; i += soChunkSize) {
-      const chunk = soIds.slice(i, i + soChunkSize);
-      
-      const { data, error } = await supabase
-        .from("sales_orders")
-        .select("id, so_number, order_date, customer_id, ship_to_name, deposit_id")
-        .in("id", chunk);
-
-      if (error) {
-        console.error(`❌ SO batch ${i} error:`, error);
-        continue;
+    // Helper: fetch per chunk 100 via .in()
+    async function fetchChunks(table: string, cols: string, key: string, ids: string[], size = 100): Promise<any[]> {
+      const out: any[] = [];
+      for (let i = 0; i < ids.length; i += size) {
+        const chunk = ids.slice(i, i + size);
+        const { data, error } = await supabase.from(table).select(cols).in(key, chunk);
+        if (error) { console.error(`❌ ${table} chunk ${i} error:`, error); continue; }
+        if (data) out.push(...data);
       }
-
-      if (data) salesOrders.push(...data);
+      return out;
     }
 
-    const soMap = new Map(salesOrders.map((s: any) => [s.id, s]));
-    console.log(`✅ Sales orders: ${salesOrders.length}`);
+    // =============================
+    // 2. SALES ORDERS
+    // =============================
+    const salesOrders = await fetchChunks(
+      "sales_orders",
+      "id, so_number, order_date, customer_id, ship_to_name, deposit_id, customer_order_ref",
+      "id",
+      soIds
+    );
+    const soMap = new Map(salesOrders.map((s: any) => [String(s.id), s]));
 
     // =============================
-    // 3. CUSTOMERS - BATCH FETCH
+    // 3. CUSTOMERS
     // =============================
     const customerIds = [...new Set(salesOrders.map((s: any) => s.customer_id).filter(Boolean))] as string[];
-    const customers: any[] = [];
-    const custChunkSize = 100;
-
-    for (let i = 0; i < customerIds.length; i += custChunkSize) {
-      const chunk = customerIds.slice(i, i + custChunkSize);
-      
-      const { data } = await supabase
-        .from("customers")
-        .select("id, name")
-        .in("id", chunk);
-
-      if (data) customers.push(...data);
-    }
-
-    const customerMap = new Map(customers.map((c: any) => [c.id, c.name]));
-    console.log(`✅ Customers: ${customers.length}`);
+    const customers = await fetchChunks("customers", "id, name", "id", customerIds);
+    const customerMap = new Map(customers.map((c: any) => [String(c.id), c.name]));
 
     // =============================
-    // 4. DEPOSITS - BATCH FETCH
+    // 4. DEPOSITS
     // =============================
     const depositIds = [...new Set(salesOrders.map((s: any) => s.deposit_id).filter(Boolean))] as string[];
-    const depositMap = new Map<string, string>();
-
-    if (depositIds.length > 0) {
-      const deposits: any[] = [];
-      const depChunkSize = 100;
-
-      for (let i = 0; i < depositIds.length; i += depChunkSize) {
-        const chunk = depositIds.slice(i, i + depChunkSize);
-        
-        const { data } = await supabase
-          .from("deposits")
-          .select("id, deposit_code")
-          .in("id", chunk);
-
-        if (data) deposits.push(...data);
-      }
-
-      deposits.forEach((d: any) => depositMap.set(d.id, d.deposit_code));
-      console.log(`✅ Deposits: ${deposits.length}`);
-    }
+    const deposits = depositIds.length ? await fetchChunks("deposits", "id, deposit_code", "id", depositIds) : [];
+    const depositMap = new Map(deposits.map((d: any) => [String(d.id), d.deposit_code]));
 
     // =============================
-    // 5. SALES ORDER ITEMS - BATCH FETCH
+    // 5. SALES ORDER ITEMS
     // =============================
-    const soItems: any[] = [];
-    const soItemChunkSize = 100;
-
-    for (let i = 0; i < soIds.length; i += soItemChunkSize) {
-      const chunk = soIds.slice(i, i + soItemChunkSize);
-      
-      const { data } = await supabase
-        .from("sales_order_items")
-        .select("sales_order_id, product_id, pallet_qty, total_pcs, price_per_m3, total_price")
-        .in("sales_order_id", chunk);
-
-      if (data) soItems.push(...data);
-    }
-
-    console.log(`✅ SO Items: ${soItems.length}`);
+    const soItems = await fetchChunks(
+      "sales_order_items",
+      "sales_order_id, product_id, pallet_qty, total_pcs, price_per_m3, total_price",
+      "sales_order_id",
+      soIds
+    );
 
     // =============================
-    // 6. PRODUCTS - BATCH FETCH
+    // 6. RETURNS
     // =============================
-    const productIds = [...new Set(soItems.map((i: any) => i.product_id).filter(Boolean))] as string[];
-    const products: any[] = [];
-    const prodChunkSize = 100;
-
-    for (let i = 0; i < productIds.length; i += prodChunkSize) {
-      const chunk = productIds.slice(i, i + prodChunkSize);
-      
-      const { data } = await supabase
-        .from("products")
-        .select("id, name, ukuran")
-        .in("id", chunk);
-
-      if (data) products.push(...data);
-    }
-
-    const productMap = new Map(products.map((p: any) => [p.id, p]));
-    console.log(`✅ Products: ${products.length}`);
+    const returnItems = await fetchChunks(
+      "delivery_return_items",
+      "delivery_order_id, product_id, return_pcs",
+      "delivery_order_id",
+      doIds
+    );
 
     // =============================
-    // 7. AGGREGATE SO ITEMS per SO
+    // 7. PRODUCTS (dari SO items + return items)
+    // =============================
+    const productIds = [...new Set([
+      ...soItems.map((i: any) => i.product_id),
+      ...returnItems.map((r: any) => r.product_id),
+    ].filter(Boolean))] as string[];
+    const products = await fetchChunks("products", "id, name, ukuran", "id", productIds);
+    const productMap = new Map(products.map((p: any) => [String(p.id), p]));
+
+    // =============================
+    // 8. AGGREGATE SO ITEMS per SO
     // =============================
     const soSubtotalMap = new Map<string, number>();
     const soUkuranMap = new Map<string, string[]>();
     const soPaletMap = new Map<string, number>();
     const soHargaMap = new Map<string, number[]>();
+    const soItemByKey = new Map<string, any>(); // (so|product) → item pertama
 
     for (const item of soItems) {
       const key = String(item.sales_order_id);
-      const product = productMap.get(item.product_id);
+      const product = productMap.get(String(item.product_id));
 
       soSubtotalMap.set(key, (soSubtotalMap.get(key) || 0) + (item.total_price || 0));
       soPaletMap.set(key, (soPaletMap.get(key) || 0) + (item.pallet_qty || 0));
@@ -191,83 +151,69 @@ export async function GET(req: Request) {
         arr.push(item.price_per_m3);
         soHargaMap.set(key, arr);
       }
+
+      const k = `${item.sales_order_id}|${item.product_id}`;
+      if (!soItemByKey.has(k)) soItemByKey.set(k, item);
     }
 
     // =============================
-    // 8. RETURNS per DO - BATCH FETCH
+    // 9. RETUR per DO — breakdown per ukuran
     // =============================
-    const returnItems: any[] = [];
-    const retChunkSize = 100;
-
-    for (let i = 0; i < doIds.length; i += retChunkSize) {
-      const chunk = doIds.slice(i, i + retChunkSize);
-      
-      const { data } = await supabase
-        .from("delivery_return_items")
-        .select("delivery_order_id, product_id, return_pcs")
-        .in("delivery_order_id", chunk);
-
-      if (data) returnItems.push(...data);
-    }
-
-    console.log(`✅ Return items: ${returnItems.length}`);
-
-    const doReturPcsMap = new Map<string, number>();
-    const doReturRupiahMap = new Map<string, number>();
+    type ReturAgg = { r10: number; r75: number; lain: number; total: number; rupiah: number };
+    const emptyRetur = (): ReturAgg => ({ r10: 0, r75: 0, lain: 0, total: 0, rupiah: 0 });
+    const doReturMap = new Map<string, ReturAgg>();
+    let unmappedCount = 0;
 
     for (const r of returnItems) {
       const doKey = String(r.delivery_order_id);
-      doReturPcsMap.set(doKey, (doReturPcsMap.get(doKey) || 0) + (r.return_pcs || 0));
+      const pcs = Number(r.return_pcs) || 0;
+      const agg = doReturMap.get(doKey) || emptyRetur();
 
-      const delivery = deliveries.find((d: any) => d.id === r.delivery_order_id);
+      const bucket = sizeBucket(productMap.get(String(r.product_id))?.ukuran);
+      if (bucket === "10") agg.r10 += pcs;
+      else if (bucket === "7.5") agg.r75 += pcs;
+      else { agg.lain += pcs; if (pcs > 0) unmappedCount++; }
+      agg.total += pcs;
+
+      const delivery = deliveryById.get(doKey);
       if (delivery) {
-        const soItem = soItems.find(
-          (i: any) => i.sales_order_id === delivery.sales_order_id && i.product_id === r.product_id
-        );
+        const soItem = soItemByKey.get(`${delivery.sales_order_id}|${r.product_id}`);
         if (soItem && soItem.total_pcs > 0) {
           const hargaSatuan = Math.round(soItem.total_price / soItem.total_pcs);
-          doReturRupiahMap.set(doKey, (doReturRupiahMap.get(doKey) || 0) + r.return_pcs * hargaSatuan);
+          agg.rupiah += pcs * hargaSatuan;
         }
       }
+      doReturMap.set(doKey, agg);
+    }
+
+    if (unmappedCount > 0) {
+      console.warn(`⚠️ ${unmappedCount} return item dengan ukuran bukan 10/7.5 → masuk retur_lain`);
     }
 
     // =============================
-    // 9. PAYMENTS - BATCH FETCH
+    // 10. PAYMENTS
     // =============================
-    const payments: any[] = [];
-    const payChunkSize = 100;
-
-    for (let i = 0; i < doIds.length; i += payChunkSize) {
-      const chunk = doIds.slice(i, i + payChunkSize);
-      
-      const { data } = await supabase
-        .from("payments")
-        .select("delivery_order_id, status, paid_at")
-        .in("delivery_order_id", chunk);
-
-      if (data) payments.push(...data);
-    }
-
-    const paymentMap = new Map(payments.map((p: any) => [p.delivery_order_id, p]));
-    console.log(`✅ Payments: ${payments.length}`);
+    const payments = await fetchChunks("payments", "delivery_order_id, status, paid_at", "delivery_order_id", doIds);
+    const paymentMap = new Map(payments.map((p: any) => [String(p.delivery_order_id), p]));
 
     // =============================
-    // 10. BUILD ROWS
+    // 11. BUILD ROWS
     // =============================
     const rows = deliveries.map((d: any) => {
-      const so = soMap.get(String(d.sales_order_id));
       const soKey = String(d.sales_order_id);
       const doKey = String(d.id);
+      const so = soMap.get(soKey);
 
       const supplier = so?.customer_id ? customerMap.get(String(so.customer_id)) ?? "-" : "-";
       const depositCode = so?.deposit_id ? depositMap.get(String(so.deposit_id)) ?? "-" : "-";
 
       const subtotal = soSubtotalMap.get(soKey) || 0;
-      const returRupiah = doReturRupiahMap.get(doKey) || 0;
-      const tagihan = subtotal - returRupiah;
+      const ret = doReturMap.get(doKey) || emptyRetur();
+      const tagihan = subtotal - ret.rupiah;
 
       const ukuranArr = soUkuranMap.get(soKey) || [];
       const hargaArr = soHargaMap.get(soKey) || [];
+      const pay = paymentMap.get(doKey);
 
       return {
         id: d.id,
@@ -275,19 +221,23 @@ export async function GET(req: Request) {
         so_number: so?.so_number ?? "-",
         deposit_code: depositCode,
         sj_number: d.sj_number ?? "-",
+        no_gudang: d.no_gudang || "-",
         supplier,
+        no_ref: so?.customer_order_ref || d.customer_order_ref || "-",
         toko: so?.ship_to_name ?? "-",
         ukuran: ukuranArr.join(", ") || "-",
         palet: soPaletMap.get(soKey) || 0,
         harga_m3: hargaArr.length > 0 ? hargaArr[0] : null,
-        jumlah_retur: doReturPcsMap.get(doKey) || 0,
+        retur_10: ret.r10,
+        retur_75: ret.r75,
+        retur_lain: ret.lain,
+        jumlah_retur: ret.total,
+        retur_rupiah: ret.rupiah,
         tagihan,
-        payment_date: (paymentMap.get(doKey) as any)?.paid_at ?? null,
-        status: (paymentMap.get(doKey) as any)?.status ?? "unpaid",
+        payment_date: pay?.paid_at ?? null,
+        status: pay?.status ?? "unpaid",
       };
     });
-
-    console.log(`✅ Final rows: ${rows.length}`);
 
     return NextResponse.json(rows);
 
