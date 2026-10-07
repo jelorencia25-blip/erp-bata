@@ -1,4 +1,7 @@
 export const dynamic = 'force-dynamic'
+// ⚠️ Sesuaikan dengan region Supabase lo (sin1 = Singapore)
+export const preferredRegion = 'sin1'
+export const maxDuration = 60
 
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -14,11 +17,32 @@ function sizeBucket(u: unknown): "10" | "7.5" | null {
   return null;
 }
 
+// Jalankan fn untuk tiap item dengan maksimal `limit` paralel, hasil tetap urut
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) break;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+const CONCURRENCY = 8;
+const CHUNK = 100;
+const PAGE = 1000;
+
 export async function GET(req: Request) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  const t0 = Date.now();
 
   try {
     const { searchParams } = new URL(req.url);
@@ -26,30 +50,34 @@ export async function GET(req: Request) {
     const dateTo = searchParams.get("date_to");
 
     // =============================
-    // 1. DELIVERY ORDERS - MANUAL PAGINATION
+    // 1. DELIVERY ORDERS — filter di DB, halaman paralel
     // =============================
-    const allDeliveries: any[] = [];
-    let from = 0;
-    const batch = 1000;
-
-    while (true) {
-      const { data, error } = await supabase
+    const buildDoQuery = () => {
+      let q = supabase
         .from("delivery_orders")
-        .select("id, sj_number, delivery_date, sales_order_id, final_status, no_gudang, customer_order_ref")
-        .range(from, from + batch - 1)
-        .order("id", { ascending: true });
+        .select("id, sj_number, delivery_date, sales_order_id, final_status, no_gudang, customer_order_ref", { count: "exact" })
+        .eq("final_status", "final");
+      if (dateFrom) q = q.gte("delivery_date", dateFrom);
+      if (dateTo) q = q.lte("delivery_date", dateTo);
+      return q.order("id", { ascending: true });
+    };
 
-      if (error) throw error;
-      if (!data || data.length === 0) break;
+    const firstPage = await buildDoQuery().range(0, PAGE - 1);
+    if (firstPage.error) throw firstPage.error;
 
-      allDeliveries.push(...data);
-      if (data.length < batch) break;
-      from += batch;
+    const deliveries: any[] = [...(firstPage.data || [])];
+    const totalCount = firstPage.count ?? deliveries.length;
+
+    if (totalCount > PAGE) {
+      const offsets: number[] = [];
+      for (let off = PAGE; off < totalCount; off += PAGE) offsets.push(off);
+      const pages = await mapLimit(offsets, CONCURRENCY, async (off) => {
+        const { data, error } = await buildDoQuery().range(off, off + PAGE - 1);
+        if (error) throw error;
+        return data || [];
+      });
+      for (const p of pages) deliveries.push(...p);
     }
-
-    let deliveries = allDeliveries.filter((d: any) => d.final_status === "final");
-    if (dateFrom) deliveries = deliveries.filter((d: any) => d.delivery_date && d.delivery_date >= dateFrom);
-    if (dateTo) deliveries = deliveries.filter((d: any) => d.delivery_date && d.delivery_date <= dateTo);
 
     if (deliveries.length === 0) return NextResponse.json([]);
 
@@ -57,81 +85,59 @@ export async function GET(req: Request) {
     const soIds = [...new Set(deliveries.map((d: any) => d.sales_order_id).filter(Boolean))] as string[];
     const deliveryById = new Map(deliveries.map((d: any) => [String(d.id), d]));
 
-    // Helper: fetch per chunk 100 via .in()
-    async function fetchChunks(table: string, cols: string, key: string, ids: string[], size = 100): Promise<any[]> {
-      const out: any[] = [];
-      for (let i = 0; i < ids.length; i += size) {
-        const chunk = ids.slice(i, i + size);
+    // Helper: fetch chunk 100 via .in(), paralel, error = gagal total (bukan diam-diam hilang)
+    async function fetchChunks(table: string, cols: string, key: string, ids: string[]): Promise<any[]> {
+      if (ids.length === 0) return [];
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+      const results = await mapLimit(chunks, CONCURRENCY, async (chunk) => {
         const { data, error } = await supabase.from(table).select(cols).in(key, chunk);
-        if (error) { console.error(`❌ ${table} chunk ${i} error:`, error); continue; }
-        if (data) out.push(...data);
-      }
-      return out;
+        if (error) throw new Error(`${table}: ${error.message}`);
+        return data || [];
+      });
+      return results.flat();
     }
 
     // =============================
-    // 2. SALES ORDERS
+    // 2. Query yang hanya butuh soIds / doIds → jalan bareng
     // =============================
-    const salesOrders = await fetchChunks(
-      "sales_orders",
-      "id, so_number, order_date, customer_id, ship_to_name, deposit_id, customer_order_ref",
-      "id",
-      soIds
-    );
-    const soMap = new Map(salesOrders.map((s: any) => [String(s.id), s]));
+    const [salesOrders, soItems, returnItems, payments] = await Promise.all([
+      fetchChunks("sales_orders", "id, so_number, order_date, customer_id, ship_to_name, deposit_id, customer_order_ref", "id", soIds),
+      fetchChunks("sales_order_items", "sales_order_id, product_id, pallet_qty, total_pcs, price_per_m3, total_price", "sales_order_id", soIds),
+      fetchChunks("delivery_return_items", "delivery_order_id, product_id, return_pcs", "delivery_order_id", doIds),
+      fetchChunks("payments", "delivery_order_id, status, paid_at", "delivery_order_id", doIds),
+    ]);
 
     // =============================
-    // 3. CUSTOMERS
+    // 3. Query turunan (butuh hasil di atas) → jalan bareng
     // =============================
     const customerIds = [...new Set(salesOrders.map((s: any) => s.customer_id).filter(Boolean))] as string[];
-    const customers = await fetchChunks("customers", "id, name", "id", customerIds);
-    const customerMap = new Map(customers.map((c: any) => [String(c.id), c.name]));
-
-    // =============================
-    // 4. DEPOSITS
-    // =============================
     const depositIds = [...new Set(salesOrders.map((s: any) => s.deposit_id).filter(Boolean))] as string[];
-    const deposits = depositIds.length ? await fetchChunks("deposits", "id, deposit_code", "id", depositIds) : [];
-    const depositMap = new Map(deposits.map((d: any) => [String(d.id), d.deposit_code]));
-
-    // =============================
-    // 5. SALES ORDER ITEMS
-    // =============================
-    const soItems = await fetchChunks(
-      "sales_order_items",
-      "sales_order_id, product_id, pallet_qty, total_pcs, price_per_m3, total_price",
-      "sales_order_id",
-      soIds
-    );
-
-    // =============================
-    // 6. RETURNS
-    // =============================
-    const returnItems = await fetchChunks(
-      "delivery_return_items",
-      "delivery_order_id, product_id, return_pcs",
-      "delivery_order_id",
-      doIds
-    );
-
-    // =============================
-    // 7. PRODUCTS (dari SO items + return items)
-    // =============================
     const productIds = [...new Set([
       ...soItems.map((i: any) => i.product_id),
       ...returnItems.map((r: any) => r.product_id),
     ].filter(Boolean))] as string[];
-    const products = await fetchChunks("products", "id, name, ukuran", "id", productIds);
+
+    const [customers, deposits, products] = await Promise.all([
+      fetchChunks("customers", "id, name", "id", customerIds),
+      fetchChunks("deposits", "id, deposit_code", "id", depositIds),
+      fetchChunks("products", "id, name, ukuran", "id", productIds),
+    ]);
+
+    const soMap = new Map(salesOrders.map((s: any) => [String(s.id), s]));
+    const customerMap = new Map(customers.map((c: any) => [String(c.id), c.name]));
+    const depositMap = new Map(deposits.map((d: any) => [String(d.id), d.deposit_code]));
     const productMap = new Map(products.map((p: any) => [String(p.id), p]));
+    const paymentMap = new Map(payments.map((p: any) => [String(p.delivery_order_id), p]));
 
     // =============================
-    // 8. AGGREGATE SO ITEMS per SO
+    // 4. AGGREGATE SO ITEMS per SO
     // =============================
     const soSubtotalMap = new Map<string, number>();
     const soUkuranMap = new Map<string, string[]>();
     const soPaletMap = new Map<string, number>();
     const soHargaMap = new Map<string, number[]>();
-    const soItemByKey = new Map<string, any>(); // (so|product) → item pertama
+    const soItemByKey = new Map<string, any>();
 
     for (const item of soItems) {
       const key = String(item.sales_order_id);
@@ -157,7 +163,7 @@ export async function GET(req: Request) {
     }
 
     // =============================
-    // 9. RETUR per DO — breakdown per ukuran
+    // 5. RETUR per DO — breakdown per ukuran
     // =============================
     type ReturAgg = { r10: number; r75: number; lain: number; total: number; rupiah: number };
     const emptyRetur = (): ReturAgg => ({ r10: 0, r75: 0, lain: 0, total: 0, rupiah: 0 });
@@ -191,13 +197,7 @@ export async function GET(req: Request) {
     }
 
     // =============================
-    // 10. PAYMENTS
-    // =============================
-    const payments = await fetchChunks("payments", "delivery_order_id, status, paid_at", "delivery_order_id", doIds);
-    const paymentMap = new Map(payments.map((p: any) => [String(p.delivery_order_id), p]));
-
-    // =============================
-    // 11. BUILD ROWS
+    // 6. BUILD ROWS
     // =============================
     const rows = deliveries.map((d: any) => {
       const soKey = String(d.sales_order_id);
@@ -239,6 +239,7 @@ export async function GET(req: Request) {
       };
     });
 
+    console.log(`✅ rekap: ${rows.length} rows in ${Date.now() - t0}ms`);
     return NextResponse.json(rows);
 
   } catch (err: any) {
